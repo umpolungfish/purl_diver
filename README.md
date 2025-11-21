@@ -35,14 +35,6 @@
 
 **purl_diver** is an cross-platform command-line tool for extracting shellcode from PE (Portable Executable) files.
 
-### THE PIPELINE
-
----
-
-<div align="center">
-  <img src="./IMAGES/purl_diver_chart.png" alt="Extraction pipeline" width="600">
-</div>
-
 
 ---
 
@@ -491,6 +483,15 @@ Select sections to extract (e.g., 1,3 or 'all'):
 ```
 
 <br>
+
+### THE PIPELINE
+
+---
+
+<div align="center">
+  <img src="./IMAGES/purl_diver_chart.png" alt="Extraction pipeline" width="600">
+</div>
+
 
 ## TROUBLESHOOTING
 
