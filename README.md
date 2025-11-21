@@ -33,7 +33,7 @@
 
 ## OVERVIEW
 
-**purl_diver** is an cross-platform command-line tool for extracting shellcode from PE (Portable Executable) files.
+**purl_diver** is a cross-platform command-line tool for extracting shellcode from PE (Portable Executable) files.
 
 
 ---
