@@ -69,19 +69,19 @@ cl extract_shellcode.c /O2 /W4 /EHsc /Fe:extract_shellcode.exe
 **WINDOWS (MinGW):**
 
 ```bash
-gcc extract_shellcode.c -o extract_shellcode.exe -O2 -Wall
+gcc extract_shellcode.c -o extract_shellcode.exe -O2 -Wall -lm
 ```
 
 **LINUX:**
 
 ```bash
-gcc extract_shellcode.c -o extract_shellcode -O2 -Wall
+gcc extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
 ```
 
 **macOS:**
 
 ```bash
-clang extract_shellcode.c -o extract_shellcode -O2 -Wall
+clang extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
 ```
 
 ### BASIC USAGE

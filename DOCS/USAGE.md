@@ -24,6 +24,18 @@ extract_shellcode.exe [options] <input_pe_file> <output_bin_file>
 The following options are available:
 
 - `-v, --verbose`: Enable verbose output mode, showing detailed processing information.
+- `-s, --section <name>`: Include specific section by name (e.g., -s .text).
+- `--exclude <name>`: Exclude specific section by name (e.g., --exclude .rsrc).
+- `--min-size <bytes>`: Minimum section size to include (in bytes).
+- `-f, --format <format>`: Output format: binary, c, python, hex, json (default: binary).
+- `--hash`: Include SHA256 hash of extracted code in output.
+- `--entropy`: Include entropy calculation of sections.
+- `--imports`: Analyze import table (DLLs and functions imported).
+- `--batch`: Enable batch processing mode for multiple files.
+- `--interactive, -i`: Enable interactive section selection mode.
+- `--progress`: Show progress indicator for large files.
+- `--output-dir <dir>`: Directory for output files (for batch mode).
+- `--dry-run`: Analyze only, don't extract.
 - `--help`: Display usage information and exit.
 
 ## Examples

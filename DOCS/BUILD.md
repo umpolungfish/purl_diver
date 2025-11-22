@@ -31,31 +31,36 @@ cl extract_shellcode.c /O2 /W4 /EHsc /Fe:extract_shellcode.exe
 Open a terminal where the `gcc` command is available (like the one provided by Git Bash or MSYS2) and run:
 
 ```bash
-gcc extract_shellcode.c -o extract_shellcode.exe -O2 -Wall
+gcc extract_shellcode.c -o extract_shellcode.exe -O2 -Wall -lm
 ```
 
 - `-o extract_shellcode.exe`: Sets the output executable name.
 - `-O2`: Optimizes for speed.
 - `-Wall`: Enables all standard warnings.
+- `-lm`: Links the math library for entropy calculations.
 
 ### Linux (with GCC)
 
 Open a terminal and run the following command:
 
 ```bash
-gcc extract_shellcode.c -o extract_shellcode -O2 -Wall
+gcc extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
 ```
 
 This will produce an executable file named `extract_shellcode`.
+
+- `-lm`: Links the math library for entropy calculations.
 
 ### macOS (with Clang)
 
 Open a terminal and run the following command:
 
 ```bash
-clang extract_shellcode.c -o extract_shellcode -O2 -Wall
+clang extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
 ```
 
 This will produce an executable file named `extract_shellcode`.
+
+- `-lm`: Links the math library for entropy calculations.
 
 After successful compilation, you will have an executable ready to use. Refer to [USAGE.md](USAGE.md) for instructions on how to run it.

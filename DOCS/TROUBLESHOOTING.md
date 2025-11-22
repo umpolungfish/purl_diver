@@ -198,6 +198,24 @@ This guide helps users identify and resolve common issues when using the PE Shel
 - Ensure gcc is installed: `sudo apt-get install gcc`
 - Install development headers if needed
 
+### Math Library Linking Issues
+**Symptoms:** `undefined reference to 'log'` error during compilation.
+
+**Common Error Message:**
+```
+/usr/bin/ld: /tmp/ccQc4OT9.o: in function 'calculate_entropy.part.0':
+extract_shellcode.c:(.text+0xa49): undefined reference to 'log'
+collect2: error: ld returned 1 exit status
+```
+
+**Solutions:**
+- Include the math library during compilation with `-lm` flag
+- Correct compilation commands:
+  - Linux: `gcc extract_shellcode.c -o extract_shellcode -O2 -Wall -lm`
+  - macOS: `clang extract_shellcode.c -o extract_shellcode -O2 -Wall -lm`
+  - MinGW: `gcc extract_shellcode.c -o extract_shellcode.exe -O2 -Wall -lm`
+- The math library is required for entropy calculations
+
 **macOS:**
 - Install Xcode Command Line Tools: `xcode-select --install`
 - Use clang or install gcc via Homebrew
