@@ -47,6 +47,17 @@
 
 `purl_diver` tool prioritizes `security`, `robustness`, and `portability`, running seamlessly on Windows, Linux, and macOS.
 
+### 🏗️ Modular Architecture (v2.0)
+
+**purl_diver v2.0** features a completely refactored modular architecture with **9 independent modules** for improved maintainability, testability, and extensibility:
+
+- ✅ **Zero compilation warnings**
+- ✅ **100% functional parity** with monolithic version
+- ✅ **43KB binary size** (optimized)
+- ✅ **Professional-grade code organization**
+
+See [MODULAR_ARCHITECTURE.md](MODULAR_ARCHITECTURE.md) for complete architecture documentation.
+
 <br>
 
 ## BUILDING AND USAGE
@@ -59,6 +70,23 @@
 - **macOS:** Xcode Command Line Tools
 
 ### BUILDING
+
+**RECOMMENDED: Makefile Build (Modular Architecture)**
+
+```bash
+# Build modular version (purl_diver)
+make              # Default: modular build
+make modular      # Explicit modular build
+make clean        # Remove build artifacts
+
+# Other targets
+make legacy       # Build legacy monolithic version
+make help         # Show all build targets
+make debug        # Debug build with symbols
+make asan         # Build with AddressSanitizer
+```
+
+**MANUAL BUILD (Platform-Specific):**
 
 **WINDOWS (MSVC):**
 
@@ -86,9 +114,15 @@ clang extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
 
 ### BASIC USAGE
 
+> **Note**: The modular build produces the `purl_diver` binary. Legacy builds produce `extract_shellcode`. Both are functionally identical.
+
 **1. EXTRACT SHELLCODE FROM PE FILE**
 
 ```bash
+# Modular version
+./purl_diver payload.exe shellcode.bin
+
+# Legacy version
 ./extract_shellcode payload.exe shellcode.bin
 ```
 
