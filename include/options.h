@@ -29,6 +29,8 @@ typedef struct {
 
     // Analysis options
     int analyze_imports_exports;
+    int analyze_imports_only;
+    int analyze_exports_only;
     int verbose;
 
     // Processing options

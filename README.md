@@ -91,24 +91,40 @@ make asan         # Build with AddressSanitizer
 **WINDOWS (MSVC):**
 
 ```bash
+# Modular version (recommended)
+cl src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c src/entropy.c src/section_analyzer.c src/output_formats.c src/import_export_analyzer.c src/utils.c src/options.c /Iinclude /O2 /W4 /EHsc /Fe:purl_diver.exe
+
+# Legacy monolithic version
 cl extract_shellcode.c /O2 /W4 /EHsc /Fe:extract_shellcode.exe
 ```
 
 **WINDOWS (MinGW):**
 
 ```bash
+# Modular version (recommended)
+gcc -Iinclude src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c src/entropy.c src/section_analyzer.c src/output_formats.c src/import_export_analyzer.c src/utils.c src/options.c -o purl_diver.exe -O2 -Wall -lm
+
+# Legacy monolithic version
 gcc extract_shellcode.c -o extract_shellcode.exe -O2 -Wall -lm
 ```
 
 **LINUX:**
 
 ```bash
+# Modular version (recommended)
+gcc -Iinclude src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c src/entropy.c src/section_analyzer.c src/output_formats.c src/import_export_analyzer.c src/utils.c src/options.c -o purl_diver -O2 -Wall -lm
+
+# Legacy monolithic version
 gcc extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
 ```
 
 **macOS:**
 
 ```bash
+# Modular version (recommended)
+clang -Iinclude src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c src/entropy.c src/section_analyzer.c src/output_formats.c src/import_export_analyzer.c src/utils.c src/options.c -o purl_diver -O2 -Wall -lm
+
+# Legacy monolithic version
 clang extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
 ```
 
@@ -119,7 +135,7 @@ clang extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
 **1. EXTRACT SHELLCODE FROM PE FILE**
 
 ```bash
-# Modular version
+# Modular version (recommended)
 ./purl_diver payload.exe shellcode.bin
 
 # Legacy version
@@ -129,13 +145,35 @@ clang extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
 **2. ENABLE VERBOSE MODE FOR DETAILED OUTPUT**
 
 ```bash
-./extract_shellcode -v payload.exe shellcode.bin
+./purl_diver -v payload.exe shellcode.bin
 ```
 
 **3. EXTRACT WITH HASH CALCULATION**
 
 ```bash
-./extract_shellcode --hash payload.exe shellcode.bin
+./purl_diver -h payload.exe shellcode.bin
+```
+
+**5. CALCULATE ENTROPY**
+
+```bash
+./purl_diver -e payload.exe shellcode.bin
+```
+
+**6. OUTPUT IN DIFFERENT FORMATS**
+
+```bash
+# Output as C array
+./purl_diver -f c payload.exe
+
+# Output as Python byte string
+./purl_diver -f python payload.exe
+
+# Output as hex dump
+./purl_diver -f hex payload.exe
+
+# Output as JSON with metadata
+./purl_diver -f json payload.exe
 ```
 
 Success output:
@@ -145,34 +183,34 @@ Success output:
 
 ### ADVANCED USAGE EXAMPLES
 
-**EXTRACT SPECIFIC SECTION:**
+**INCLUDE SPECIFIC SECTIONS:**
 
 ```bash
-./extract_shellcode --section .text payload.exe output.bin
+./purl_diver --include .text payload.exe output.bin
 ```
 
-**EXCLUDE RESOURCE SECTION:**
+**EXCLUDE SPECIFIC SECTIONS:**
 
 ```bash
-./extract_shellcode --exclude .rsrc payload.exe output.bin
+./purl_diver --exclude .rsrc payload.exe output.bin
 ```
 
-**DRY RUN (ANALYZE WITHOUT EXTRACTING):**
+**MINIMUM SECTION SIZE:**
 
 ```bash
-./extract_shellcode --dry-run payload.exe
+./purl_diver --min-size 1024 payload.exe output.bin
 ```
 
-**INTERACTIVE SECTION SELECTION:**
+**ANALYZE IMPORT/EXPORT TABLES:**
 
 ```bash
-./extract_shellcode --interactive payload.exe output.bin
+./purl_diver -i payload.exe output.bin
 ```
 
-**BATCH PROCESSING:**
+**COMBINE MULTIPLE OPTIONS:**
 
 ```bash
-./extract_shellcode --batch --output-dir ./extracted samples/*.exe
+./purl_diver -v --hash --entropy -i payload.exe output.bin
 ```
 
 ### INSPECTING OUTPUT
@@ -274,7 +312,7 @@ hexdump -C output.bin
 Raw binary output - perfect for direct shellcode usage:
 
 ```bash
-./extract_shellcode payload.exe shellcode.bin
+./purl_diver payload.exe shellcode.bin
 ```
 
 </details>
@@ -287,7 +325,7 @@ Raw binary output - perfect for direct shellcode usage:
 Embed shellcode directly in C source:
 
 ```bash
-./extract_shellcode -f c payload.exe output.c
+./purl_diver -f c payload.exe output.c
 ```
 
 **Output:**
@@ -310,7 +348,7 @@ unsigned int shellcode_len = 8192;
 Generate Python-ready byte strings:
 
 ```bash
-./extract_shellcode -f python payload.exe output.py
+./purl_diver -f python payload.exe output.py
 ```
 
 **Output:**
@@ -330,7 +368,7 @@ shellcode += b"\xB8\x00\x00\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00"
 Human-readable hex dump with ASCII representation:
 
 ```bash
-./extract_shellcode -f hex payload.exe output.txt
+./purl_diver -f hex payload.exe output.txt
 ```
 
 **Output:**
@@ -350,7 +388,7 @@ Human-readable hex dump with ASCII representation:
 Structured metadata with extraction details:
 
 ```bash
-./extract_shellcode -f json payload.exe output.json
+./purl_diver -f json payload.exe output.json
 ```
 
 **Output:**
@@ -390,7 +428,7 @@ Structured metadata with extraction details:
 Detect packed or encrypted code sections:
 
 ```bash
-./extract_shellcode --entropy payload.exe shellcode.bin
+./purl_diver -e payload.exe shellcode.bin
 ```
 
 **Entropy interpretation:**
@@ -403,7 +441,7 @@ Detect packed or encrypted code sections:
 Generate SHA256 hash of extracted code with improved memory efficiency:
 
 ```bash
-./extract_shellcode --hash payload.exe shellcode.bin
+./purl_diver -h payload.exe shellcode.bin
 ```
 
 **Output:**
@@ -416,41 +454,29 @@ Generate SHA256 hash of extracted code with improved memory efficiency:
 Analyze PE dependencies and exports:
 
 ```bash
-./extract_shellcode --imports payload.exe shellcode.bin
+./purl_diver -i payload.exe shellcode.bin
 ```
 
 **Output:**
 ```
-[+] Import Analysis:
-    KERNEL32.dll
-      - LoadLibraryA
-      - GetProcAddress
-      - VirtualAlloc
-    USER32.dll
-      - MessageBoxA
-      
-[+] Export Analysis:
-    - Function1 (RVA: 0x1000)
-    - Function2 (RVA: 0x1050)
+[IMPORTS ANALYSIS]
+  Imported DLL: KERNEL32.dll
+    - Function: LoadLibraryA (Hint: 0)
+    - Function: GetProcAddress (Hint: 0)
+    - Function: VirtualAlloc (Hint: 0)
+  Imported DLL: USER32.dll
+    - Function: MessageBoxA (Hint: 0)
+[END IMPORTS ANALYSIS - 2 DLLs imported]
+
+[EXPORTS ANALYSIS - example.dll]
+  Base Ordinal: 1
+  Number of Functions: 2
+  Number of Names: 2
+    - Function: Function1
+    - Function: Function2
+[END EXPORTS ANALYSIS]
 ```
 
-### INTERACTIVE MODE
-
-Select sections interactively:
-
-```bash
-./extract_shellcode --interactive payload.exe output.bin
-```
-
-**Output:**
-```
-[+] Available executable sections:
-    [1] .text   (4096 bytes, entropy: 7.85)
-    [2] .rdata  (2048 bytes, entropy: 6.42)
-    [3] CODE    (1024 bytes, entropy: 7.91)
-    
-Select sections to extract (e.g., 1,3 or 'all'): 
-```
 
 <br>
 
@@ -472,8 +498,8 @@ Select sections to extract (e.g., 1,3 or 'all'):
 <td>Keep tool updated for security patches</td>
 </tr>
 <tr>
-<td><b>DRY RUN FIRST</b></td>
-<td>Use <code>--dry-run</code> to analyze before extracting</td>
+<td><b>ANALYZE FIRST</b></td>
+<td>Use <code>-v</code> and <code>-i</code> options to analyze PE before extraction</td>
 </tr>
 </table>
 
@@ -481,39 +507,24 @@ Select sections to extract (e.g., 1,3 or 'all'):
 
 ## COMMAND-LINE OPTIONS
 
-### OPTIONS
+### GENERAL OPTIONS
 
 ```
 -v, --verbose          Enable verbose output mode
+-h, --hash             Calculate and display SHA256 hash
+-e, --entropy          Calculate and display entropy
+-i, --imports-exports  Analyze import/export tables
+-f, --format <type>    Output format (binary, c, python, hex, json)
 --help                 Display usage information and exit
+--version              Display version information
 ```
 
-### FILTERING
+### FILTERING OPTIONS
 
 ```
--s, --section <name>   Include specific section by name
---exclude <name>       Exclude specific section by name
---min-size <bytes>     Minimum section size to include
-```
-
-### OPTIONS
-
-```
--f, --format <format>  Output format (binary, c, python, hex, json)
---dry-run              Analyze only, don't extract
---hash                 Include SHA256 hash of extracted code
---entropy              Include entropy calculation of sections
---imports              Analyze import table
---exports              Analyze export table
-```
-
-### OPTIONS
-
-```
---interactive, -i      Enable interactive section selection
---progress             Show progress indicator for large files
---batch                Enable batch processing mode
---output-dir <dir>     Directory for output files (batch mode)
+--include <sections>   Only extract specified sections (comma-separated)
+--exclude <sections>   Exclude specified sections (comma-separated)
+--min-size <bytes>     Minimum section size to extract
 ```
 
 <br>
@@ -562,16 +573,16 @@ Select sections to extract (e.g., 1,3 or 'all'):
 
 ### PERFORMANCE TIPS
 
-For large files (>1MB), enable progress indicator:
+Analyze large files with verbose mode to see detailed information:
 
 ```bash
-./extract_shellcode --progress large_file.exe output.bin
+./purl_diver -v large_file.exe output.bin
 ```
 
-For batch processing, use output directory:
+Include hash and entropy analysis for comprehensive output:
 
 ```bash
-./extract_shellcode --batch --output-dir ./extracted samples/*.exe
+./purl_diver -v -h -e -i large_file.exe output.bin
 ```
 <br>
 
