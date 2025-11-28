@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <limits.h>
 #include <math.h>
+#include <errno.h>
 
 // Platform-specific header for PE structures
 #ifdef _WIN32
@@ -275,18 +276,37 @@ static char **input_files = NULL;  // Array of input file paths
 static int num_input_files = 0;    // Number of input files
 static size_t input_files_capacity = 0;  // Capacity of input_files array
 
+// Forward declaration for functions used in cleanup_all
+void free_section_filters(void);
+
+// Global cleanup function to be called on exit to ensure all resources are freed
+void cleanup_all(void) {
+    free_section_filters();
+
+    // Free batch input files
+    if (input_files) {
+        for (int i = 0; i < num_input_files; i++) {
+            free(input_files[i]);
+        }
+        free(input_files);
+        input_files = NULL;
+        num_input_files = 0;
+        input_files_capacity = 0;
+    }
+}
+
 // Function declarations for modular design
+char* my_strdup(const char* s);  // Custom strdup implementation
 int validate_pe_structure(FILE *f, unsigned char **buffer, long *file_size);
 int detect_overlaps_and_calculate_size(PIMAGE_SECTION_HEADER *valid_sections,
                                        size_t num_valid_sections, size_t *total_shellcode_size);
 int is_section_included(PIMAGE_SECTION_HEADER section);
 int parse_section_name(const char *section_str, char ***section_names, size_t *count);
-void free_section_filters(void);
 void output_as_c_array(unsigned char *data, size_t size, const char *filename);
 void output_as_python(unsigned char *data, size_t size, const char *filename);
 void output_as_hex_dump(unsigned char *data, size_t size, const char *filename);
-void output_as_json(unsigned char *data, size_t size, const char *input_path, 
-                    PIMAGE_SECTION_HEADER *valid_sections, size_t num_valid_sections, 
+void output_as_json(unsigned char *data, size_t size, const char *input_path,
+                    PIMAGE_SECTION_HEADER *valid_sections, size_t num_valid_sections,
                     DWORD entry_point_rva, WORD machine);
 
 // PE Context structure to consolidate PE file information and avoid repeated access to headers
@@ -320,7 +340,6 @@ int detect_overlaps_and_calculate_size(PIMAGE_SECTION_HEADER *valid_sections,
                                        size_t num_valid_sections, size_t *total_shellcode_size);
 int is_section_included(PIMAGE_SECTION_HEADER section);
 int parse_section_name(const char *section_str, char ***section_names, size_t *count);
-void free_section_filters(void);
 void output_as_c_array(unsigned char *data, size_t size, const char *filename);
 void output_as_python(unsigned char *data, size_t size, const char *filename);
 void output_as_hex_dump(unsigned char *data, size_t size, const char *filename);
@@ -447,16 +466,16 @@ int is_section_included(PIMAGE_SECTION_HEADER section) {
     char section_name[IMAGE_SIZEOF_SHORT_NAME + 1];
     memcpy(section_name, section->Name, IMAGE_SIZEOF_SHORT_NAME);
     section_name[IMAGE_SIZEOF_SHORT_NAME] = '\0';  // Ensure null termination
-    
+
     // Check minimum section size filter
     if (min_section_size > 0 && section->SizeOfRawData < min_section_size) {
         if (verbose) {
-            printf("[DEBUG] Skipping section '%s' - smaller than minimum size (%d < %d)\n", 
+            printf("[DEBUG] Skipping section '%s' - smaller than minimum size (%d < %d)\n",
                    section_name, section->SizeOfRawData, min_section_size);
         }
         return 0;
     }
-    
+
     // If include sections are specified, only these are allowed
     if (include_sections && include_count > 0) {
         for (size_t i = 0; i < include_count; i++) {
@@ -472,7 +491,7 @@ int is_section_included(PIMAGE_SECTION_HEADER section) {
         }
         return 0;  // Not in the include list
     }
-    
+
     // If exclude sections are specified, these are not allowed
     if (exclude_sections && exclude_count > 0) {
         for (size_t i = 0; i < exclude_count; i++) {
@@ -484,7 +503,7 @@ int is_section_included(PIMAGE_SECTION_HEADER section) {
             }
         }
     }
-    
+
     // Default: include the section if it passes other filters
     return 1;
 }
@@ -503,7 +522,7 @@ int parse_section_name(const char *section_str, char ***section_names, size_t *c
     if (!*section_names) return 1;
 
     *count = 0;
-    char *temp = strdup(section_str);
+    char *temp = my_strdup(section_str);
     if (!temp) {
         free(*section_names);
         return 1;
@@ -517,7 +536,7 @@ int parse_section_name(const char *section_str, char ***section_names, size_t *c
         while (end > token && *end == ' ') end--;
         *(end + 1) = '\0';
 
-        (*section_names)[*count] = strdup(token);
+        (*section_names)[*count] = my_strdup(token);
         if (!(*section_names)[*count]) {
             // Cleanup
             for (size_t i = 0; i < *count; i++) free((*section_names)[i]);
@@ -567,6 +586,7 @@ void output_as_c_array(unsigned char *data, size_t size, const char *filename) {
 
 // Output shellcode as Python byte string
 void output_as_python(unsigned char *data, size_t size, const char *filename) {
+    (void)filename; // Suppress unused parameter warning
     printf("shellcode = b\"");
     for (size_t i = 0; i < size; i++) {
         printf("\\x%02X", data[i]);
@@ -576,6 +596,7 @@ void output_as_python(unsigned char *data, size_t size, const char *filename) {
 
 // Output shellcode as hex dump
 void output_as_hex_dump(unsigned char *data, size_t size, const char *filename) {
+    (void)filename; // Suppress unused parameter warning
     for (size_t i = 0; i < size; i += 16) {
         printf("%08zX: ", i);
         for (int j = 0; j < 16; j++) {
@@ -681,6 +702,7 @@ void md5_init(MD5_Context *ctx) {
 }
 
 // Process a single 512-bit block
+// MD5 implementation following RFC 1321 - The MD5 Message-Digest Algorithm
 static void md5_process_block(MD5_Context *ctx, const unsigned char *block) {
     uint32_t k[64] = {
         0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
@@ -837,6 +859,7 @@ void sha256_init(SHA256_Context *ctx) {
 }
 
 // Process a single 512-bit block
+// SHA256 implementation following FIPS PUB 180-4 - Secure Hash Standard (SHS)
 static void sha256_process_block(SHA256_Context *ctx, const unsigned char *block) {
     uint32_t w[64];
     uint32_t k[64] = {
@@ -1283,9 +1306,18 @@ void analyze_exports(unsigned char *buffer, DWORD rva_to_exports, WORD machine, 
     printf("[END EXPORTS ANALYSIS]\n\n");
 }
 
+// Custom implementation of strdup for better portability
+char* my_strdup(const char* s) {
+    if (!s) return NULL;
+    size_t len = strlen(s) + 1;
+    char* d = malloc(len);
+    if (d) memcpy(d, s, len);
+    return d;
+}
+
 // Function to add a file to the input list for batch processing
 int add_input_file(const char *file_path) {
-    if (num_input_files >= input_files_capacity) {
+    if ((size_t)num_input_files >= input_files_capacity) {
         // Need to expand the array
         size_t new_capacity = (input_files_capacity == 0) ? 4 : input_files_capacity * 2;
         char **new_array = (char **)realloc(input_files, new_capacity * sizeof(char *));
@@ -1296,14 +1328,14 @@ int add_input_file(const char *file_path) {
         input_files = new_array;
         input_files_capacity = new_capacity;
     }
-    
-    input_files[num_input_files] = strdup(file_path);
+
+    input_files[num_input_files] = my_strdup(file_path);
     if (!input_files[num_input_files]) {
         fprintf(stderr, "[-] Error: Memory allocation failed for input file path.\n");
         return 1;
     }
     num_input_files++;
-    
+
     return 0;
 }
 
@@ -1326,27 +1358,34 @@ int interactive_section_selection(PIMAGE_SECTION_HEADER *sections, size_t num_se
     
     printf("\nEnter section numbers to extract (e.g., '1,3' or 'all'): ");
     fflush(stdout);
-    
+
     char input[1024];
     if (fgets(input, sizeof(input), stdin) == NULL) {
         fprintf(stderr, "[-] Error reading input.\n");
         return -1; // Error
     }
-    
+
     // Process the input
     if (strncmp(input, "all", 3) == 0 || strncmp(input, "ALL", 3) == 0) {
         // Select all sections - this is handled by not filtering sections
         return 1; // Continue with all sections
     }
-    
+
     // Parse comma-separated list of section numbers
     // For simplicity, we'll implement a different approach:
     // We'll create include_filters for the selected sections
     char *token = strtok(input, ", \n");
+    size_t selections_made = 0;  // Track if any valid selections were made
     while (token != NULL) {
+        // Skip empty tokens
+        if (strlen(token) == 0) {
+            token = strtok(NULL, ", \n");
+            continue;
+        }
+
         char *endptr;
         long section_num = strtol(token, &endptr, 10);
-        
+
         if (*endptr != '\0' || section_num < 1 || section_num > (long)num_sections) {
             printf("[!] Invalid section number: %s\n", token);
         } else {
@@ -1354,7 +1393,7 @@ int interactive_section_selection(PIMAGE_SECTION_HEADER *sections, size_t num_se
             char section_name[IMAGE_SIZEOF_SHORT_NAME + 1];
             memcpy(section_name, sections[section_num - 1]->Name, IMAGE_SIZEOF_SHORT_NAME);
             section_name[IMAGE_SIZEOF_SHORT_NAME] = '\0';
-            
+
             // Add to include sections filter
             char **temp_include = (char **)realloc(include_sections, (include_count + 1) * sizeof(char *));
             if (!temp_include) {
@@ -1362,8 +1401,8 @@ int interactive_section_selection(PIMAGE_SECTION_HEADER *sections, size_t num_se
                 return -1;
             }
             include_sections = temp_include;
-            
-            include_sections[include_count] = strdup(section_name);
+
+            include_sections[include_count] = my_strdup(section_name);
             if (!include_sections[include_count]) {
                 fprintf(stderr, "[-] Error: Memory allocation failed for section name.\n");
                 // Free previously allocated sections to prevent memory leak
@@ -1376,11 +1415,17 @@ int interactive_section_selection(PIMAGE_SECTION_HEADER *sections, size_t num_se
                 return -1;
             }
             include_count++;
+            selections_made++;
         }
-        
+
         token = strtok(NULL, ", \n");
     }
-    
+
+    // If no valid selections were made, return 0 to indicate no sections selected
+    if (selections_made == 0) {
+        return 0;
+    }
+
     return 1; // Process with selected filters
 }
 
@@ -1420,7 +1465,7 @@ void print_imports_exports_summary(unsigned char *buffer, WORD machine, long fil
 int validate_pe_structure(FILE *f, unsigned char **buffer, long *file_size) {
     fseek(f, 0, SEEK_END);
     *file_size = ftell(f);
-    if (*file_size <= sizeof(IMAGE_DOS_HEADER)) {
+    if (*file_size <= (long)sizeof(IMAGE_DOS_HEADER)) {
         fprintf(stderr, "[-] Error: Invalid or empty file.\n");
         fclose(f);
         return 1;
@@ -1442,7 +1487,7 @@ int validate_pe_structure(FILE *f, unsigned char **buffer, long *file_size) {
         return 1;
     }
 
-    if (fread(*buffer, 1, *file_size, f) != *file_size) {
+    if (fread(*buffer, 1, *file_size, f) != (size_t)*file_size) {
         fprintf(stderr, "[-] Error: Failed to read input file.\n");
         free(*buffer);
         fclose(f);
@@ -1458,7 +1503,7 @@ int validate_pe_structure(FILE *f, unsigned char **buffer, long *file_size) {
     }
 
     DWORD nt_headers_offset = dos_header->e_lfanew;
-    if (nt_headers_offset + sizeof(IMAGE_NT_HEADERS32) > *file_size) {
+    if (nt_headers_offset + sizeof(IMAGE_NT_HEADERS32) > (DWORD)*file_size) {
         fprintf(stderr, "[-] Error: Invalid NT headers offset.\n");
         free(*buffer);
         return 1;
@@ -1523,9 +1568,6 @@ int find_executable_sections(PE_Context *ctx, PIMAGE_SECTION_HEADER **valid_sect
         }
     }
 
-    // Sort sections by raw data address
-    qsort(*valid_sections, *num_valid_sections, sizeof(PIMAGE_SECTION_HEADER), compare_sections);
-
     // Identify which section contains the entry point
     if (verbose && ctx->entry_point_rva != 0) {
         for (size_t i = 0; i < *num_valid_sections; i++) {
@@ -1540,6 +1582,9 @@ int find_executable_sections(PE_Context *ctx, PIMAGE_SECTION_HEADER **valid_sect
         }
     }
 
+    // Sort sections by raw data address for proper entry point identification
+    qsort(*valid_sections, *num_valid_sections, sizeof(PIMAGE_SECTION_HEADER), compare_sections);
+
     if (*num_valid_sections == 0) {
         fprintf(stdout, "[!] Warning: No executable sections found.\n");
         free(*valid_sections);
@@ -1550,33 +1595,52 @@ int find_executable_sections(PE_Context *ctx, PIMAGE_SECTION_HEADER **valid_sect
 }
 
 // Detect overlapping sections and calculate total size
-int detect_overlaps_and_calculate_size(PIMAGE_SECTION_HEADER *valid_sections, 
+int detect_overlaps_and_calculate_size(PIMAGE_SECTION_HEADER *valid_sections,
                                        size_t num_valid_sections, size_t *total_shellcode_size) {
+    // Create a copy of the sections array to sort without modifying the original
+    PIMAGE_SECTION_HEADER *sorted_sections = (PIMAGE_SECTION_HEADER *)malloc(num_valid_sections * sizeof(PIMAGE_SECTION_HEADER));
+    if (!sorted_sections) {
+        fprintf(stderr, "[-] Error: Memory allocation failed for section sorting.\n");
+        return 1;
+    }
+
+    // Copy pointers to the new array
+    for (size_t i = 0; i < num_valid_sections; i++) {
+        sorted_sections[i] = valid_sections[i];
+    }
+
+    // Sort the copy by raw data address to ensure proper overlap detection
+    qsort(sorted_sections, num_valid_sections, sizeof(PIMAGE_SECTION_HEADER), compare_sections);
+
     *total_shellcode_size = 0;
     DWORD last_section_end = 0;
     for (size_t i = 0; i < num_valid_sections; i++) {
-        PIMAGE_SECTION_HEADER section = valid_sections[i];
-        
+        PIMAGE_SECTION_HEADER section = sorted_sections[i];
+
         // Check for potential integer overflows in section bounds
         if (section->PointerToRawData > UINT32_MAX - section->SizeOfRawData) {
             fprintf(stderr, "[-] Error: Section extends beyond addressable space.\n");
+            free(sorted_sections);
             return 1;
         }
-        
+
         if (section->PointerToRawData < last_section_end) {
             fprintf(stdout, "[!] Warning: Skipping overlapping section '%.8s'.\n", (char*)section->Name);
             continue;
         }
-        
+
         // Integer overflow protection for size calculation
         if (section->SizeOfRawData > SIZE_MAX - *total_shellcode_size) {
             fprintf(stderr, "[-] Error: Size calculation would overflow.\n");
+            free(sorted_sections);
             return 1;
         }
-        
+
         *total_shellcode_size += section->SizeOfRawData;
         last_section_end = section->PointerToRawData + section->SizeOfRawData;
     }
+
+    free(sorted_sections);
 
     if (*total_shellcode_size == 0) {
         fprintf(stdout, "[!] Warning: All executable sections were overlapping or empty.\n");
@@ -1609,16 +1673,34 @@ int extract_shellcode(const char *input_path, const char *output_path) {
         return 0;  // Not an error, just no executable code found
     }
 
-    // First pass: calculate total size of non-overlapping sections
+    // Create a sorted copy of sections for overlap detection
+    PIMAGE_SECTION_HEADER *sorted_sections = (PIMAGE_SECTION_HEADER *)malloc(num_valid_sections * sizeof(PIMAGE_SECTION_HEADER));
+    if (!sorted_sections) {
+        fprintf(stderr, "[-] Error: Memory allocation failed for section sorting.\n");
+        free(valid_sections);
+        cleanup_pe_context(&ctx);
+        return 1;
+    }
+
+    // Copy the section pointers for sorting
+    for (size_t i = 0; i < num_valid_sections; i++) {
+        sorted_sections[i] = valid_sections[i];
+    }
+
+    // Sort the copy by raw data address to ensure proper overlap detection
+    qsort(sorted_sections, num_valid_sections, sizeof(PIMAGE_SECTION_HEADER), compare_sections);
+
+    // First pass: calculate total size of non-overlapping sections using sorted order
     size_t total_shellcode_size = 0;
     DWORD last_section_end = 0;
     for (size_t i = 0; i < num_valid_sections; i++) {
-        PIMAGE_SECTION_HEADER section = valid_sections[i];
+        PIMAGE_SECTION_HEADER section = sorted_sections[i];
 
         // Check for potential integer overflows in section bounds
         if (section->PointerToRawData > UINT32_MAX - section->SizeOfRawData) {
             fprintf(stderr, "[-] Error: Section extends beyond addressable space.\n");
-            free(valid_sections);  // Note: output_buffer not allocated yet
+            free(sorted_sections);
+            free(valid_sections);
             cleanup_pe_context(&ctx);
             return 1;
         }
@@ -1631,6 +1713,7 @@ int extract_shellcode(const char *input_path, const char *output_path) {
         // Integer overflow protection for size calculation
         if (section->SizeOfRawData > SIZE_MAX - total_shellcode_size) {
             fprintf(stderr, "[-] Error: Size calculation would overflow.\n");
+            free(sorted_sections);
             free(valid_sections);
             cleanup_pe_context(&ctx);
             return 1;
@@ -1639,6 +1722,9 @@ int extract_shellcode(const char *input_path, const char *output_path) {
         total_shellcode_size += section->SizeOfRawData;
         last_section_end = section->PointerToRawData + section->SizeOfRawData;
     }
+
+    // Free the sorted copy as we no longer need it for size calculation
+    free(sorted_sections);
 
     if (total_shellcode_size == 0) {
         fprintf(stdout, "[!] Warning: All executable sections were overlapping or empty.\n");
@@ -1655,6 +1741,24 @@ int extract_shellcode(const char *input_path, const char *output_path) {
         return 1;
     }
 
+    // Create another sorted copy for the second pass (actual data copying)
+    PIMAGE_SECTION_HEADER *copy_sections = (PIMAGE_SECTION_HEADER *)malloc(num_valid_sections * sizeof(PIMAGE_SECTION_HEADER));
+    if (!copy_sections) {
+        fprintf(stderr, "[-] Error: Memory allocation failed for section copying.\n");
+        free(output_buffer);
+        free(valid_sections);
+        cleanup_pe_context(&ctx);
+        return 1;
+    }
+
+    // Copy the section pointers again for the copying phase
+    for (size_t i = 0; i < num_valid_sections; i++) {
+        copy_sections[i] = valid_sections[i];
+    }
+
+    // Sort for copying in the correct order to maintain proper sequencing
+    qsort(copy_sections, num_valid_sections, sizeof(PIMAGE_SECTION_HEADER), compare_sections);
+
     // Second pass: copy section data to the output buffer
     size_t current_pos = 0;
     last_section_end = 0;
@@ -1666,14 +1770,15 @@ int extract_shellcode(const char *input_path, const char *output_path) {
     }
 
     for (size_t i = 0; i < num_valid_sections; i++) {
-        PIMAGE_SECTION_HEADER section = valid_sections[i];
+        PIMAGE_SECTION_HEADER section = copy_sections[i];
         if (section->PointerToRawData < last_section_end) {
-            continue; // Skip overlapping
+            continue; // Skip overlapping sections that were detected in first pass
         }
 
         // Integer overflow protection for position calculation
         if (section->SizeOfRawData > SIZE_MAX - current_pos) {
             fprintf(stderr, "[-] Error: Position calculation would overflow.\n");
+            free(copy_sections);
             free(output_buffer);
             free(valid_sections);
             cleanup_pe_context(&ctx);
@@ -1691,6 +1796,9 @@ int extract_shellcode(const char *input_path, const char *output_path) {
             fflush(stdout);
         }
     }
+
+    // Free the copy used for data copying
+    free(copy_sections);
 
     // Final progress update
     if (show_progress && total_shellcode_size > 1024 * 1024) {
@@ -1897,12 +2005,25 @@ int parse_arguments(int argc, char **argv, const char **input_path, const char *
                 }
                 arg_processed[i] = 1;  // Mark the argument as processed too
                 char *endptr;
-                min_section_size = (DWORD)strtoul(argv[i], &endptr, 10);
+                errno = 0;  // Reset errno to detect errors
+                unsigned long long_val = strtoul(argv[i], &endptr, 10);
+
+                // Check if conversion was successful
                 if (*endptr != '\0') {
                     fprintf(stderr, "[-] Error: Invalid number for --min-size: %s\n", argv[i]);
                     free(arg_processed);
                     return 1;
                 }
+
+                // Check for overflow and clamp to DWORD
+                if (errno == ERANGE || long_val > UINT32_MAX) {
+                    fprintf(stderr, "[-] Error: --min-size value too large: %s\n", argv[i]);
+                    free(arg_processed);
+                    return 1;
+                }
+
+                // Clamp to 0 if underflow (though unsigned long doesn't underflow, it's good practice)
+                min_section_size = (DWORD)long_val;
             } else if (strcmp(argv[i], "--dry-run") == 0) {
                 dry_run = 1;
             } else if (strcmp(argv[i], "--hash") == 0 || strcmp(argv[i], "--include-hash") == 0) {
@@ -2015,10 +2136,23 @@ int parse_arguments(int argc, char **argv, const char **input_path, const char *
         }
 
         if (output_format == OUTPUT_BINARY) {
-            // Binary format requires both input and output files
-            if (file_args_count != 2) {
+            if (file_args_count == 0) {
+                // No input file provided
                 fprintf(stderr, "PE Shellcode Extractor\n");
-                fprintf(stderr, "Usage: %s [options] <input.exe> <output.bin>\n", argv[0]);
+                fprintf(stderr, "Usage: %s [options] <input.exe> [output.bin]\n", argv[0]);
+                fprintf(stderr, "Use --help for more options.\n");
+                free(arg_processed);
+                return 1;
+            } else if (file_args_count == 1) {
+                // Only input file provided - will handle default output path in main processing
+                // Set a marker that we need default output path
+                *output_path = NULL;  // Signal that we need to generate a default path
+            } else if (file_args_count == 2) {
+                // Both input and output files provided - normal case
+            } else {
+                // Too many file arguments
+                fprintf(stderr, "PE Shellcode Extractor\n");
+                fprintf(stderr, "Usage: %s [options] <input.exe> [output.bin]\n", argv[0]);
                 fprintf(stderr, "Use --help for more options.\n");
                 free(arg_processed);
                 return 1;
@@ -2044,17 +2178,15 @@ int parse_arguments(int argc, char **argv, const char **input_path, const char *
 }
 
 int main(int argc, char **argv) {
+    // Register global cleanup function to run on exit
+    atexit(cleanup_all);
+
     const char *input_path = NULL;
     const char *output_path = NULL;
-    
+
     int result = parse_arguments(argc, argv, &input_path, &output_path);
     if (result != 0) {
-        free_section_filters();  // Free any allocated filters
-        // Free batch input files if allocated
-        for (int i = 0; i < num_input_files; i++) {
-            free(input_files[i]);
-        }
-        free(input_files);
+        // No need to call free_section_filters() as cleanup_all() will be called via atexit()
         return (result == -1) ? 0 : 1;  // Return 0 for help, 1 for error
     }
 
@@ -2076,7 +2208,7 @@ int main(int argc, char **argv) {
                         batch_output_dir, filename);
             } else {
                 // Use same directory as input file but with _shellcode suffix
-                char *temp_path = strdup(input_files[i]);
+                char *temp_path = my_strdup(input_files[i]);
                 char *ext = strrchr(temp_path, '.');
                 if (ext) *ext = '\0';  // Remove extension
                 snprintf(output_file_path, sizeof(output_file_path), "%s_shellcode.bin", temp_path);
@@ -2111,7 +2243,7 @@ int main(int argc, char **argv) {
                 }
 
                 fseek(f, 0, SEEK_SET);
-                if (fread(buffer, 1, file_size, f) != file_size) {
+                if (fread(buffer, 1, file_size, f) != (size_t)file_size) {
                     fprintf(stderr, "[-] Error: Failed to read input file.\n");
                     fclose(f);
                     free(buffer);
@@ -2214,7 +2346,7 @@ int main(int argc, char **argv) {
             }
 
             fseek(f, 0, SEEK_SET);
-            if (fread(buffer, 1, file_size, f) != file_size) {
+            if (fread(buffer, 1, file_size, f) != (size_t)file_size) {
                 fprintf(stderr, "[-] Error: Failed to read input file.\n");
                 fclose(f);
                 free(buffer);
@@ -2299,7 +2431,7 @@ int main(int argc, char **argv) {
                 }
 
                 fseek(f, 0, SEEK_SET);
-                if (fread(buffer, 1, file_size, f) != file_size) {
+                if (fread(buffer, 1, file_size, f) != (size_t)file_size) {
                     fprintf(stderr, "[-] Error: Failed to read input file.\n");
                     fclose(f);
                     free(buffer);
@@ -2365,11 +2497,11 @@ int main(int argc, char **argv) {
                     return 1;
                 } else if (result == 0) {
                     // User selected no sections
-                    printf("[*] No sections selected for extraction.\n");
+                    fprintf(stderr, "[-] Error: No sections selected for extraction.\n");
                     if (valid_sections) free(valid_sections);
                     free(buffer);
                     free_section_filters();
-                    return 0;
+                    return 1;  // Return error code instead of 0, as no extraction occurred
                 }
 
                 // Cleanup analysis data, keep filters
@@ -2377,8 +2509,41 @@ int main(int argc, char **argv) {
                 free(buffer);
             }
             
-            // Now run extraction with any filters that were set 
-            result = extract_shellcode(input_path, output_path);
+            // For binary output format, if no output path was specified, generate a default
+            if (output_format == OUTPUT_BINARY && output_path == NULL) {
+                // Generate default output path as input + ".shellcode.bin"
+                const char *input_filename = strrchr(input_path, '/');
+                if (!input_filename) {
+                    input_filename = strrchr(input_path, '\\');
+                }
+                if (!input_filename) {
+                    input_filename = input_path;
+                } else {
+                    input_filename++; // Skip the separator
+                }
+
+                // Allocate memory for the default output path
+                size_t input_len = strlen(input_filename);
+                size_t output_path_len = input_len + 15; // +15 for ".shellcode.bin" and null terminator
+                char *default_output = malloc(output_path_len);
+                if (!default_output) {
+                    fprintf(stderr, "[-] Error: Memory allocation failed for default output path.\n");
+                    free_section_filters();
+                    return 1;
+                }
+
+                snprintf(default_output, output_path_len, "%s.shellcode.bin", input_filename);
+
+                // Run extraction with generated output path
+                result = extract_shellcode(input_path, default_output);
+
+                // Free the generated output path
+                free(default_output);
+            } else {
+                // Run extraction with specified output path
+                result = extract_shellcode(input_path, output_path);
+            }
+
             free_section_filters();  // Free any allocated filters
             return result;
         }

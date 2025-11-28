@@ -51,7 +51,7 @@
 
 **purl_diver v2.0** features a completely refactored modular architecture with **9 independent modules** for improved maintainability, testability, and extensibility:
 
-- ✅ **Zero compilation warnings**
+- ✅ **Zero compilation warnings** (clean build with -Werror)
 - ✅ **100% functional parity** with monolithic version
 - ✅ **43KB binary size** (optimized)
 - ✅ **Professional-grade code organization**
@@ -84,6 +84,8 @@ make legacy       # Build legacy monolithic version
 make help         # Show all build targets
 make debug        # Debug build with symbols
 make asan         # Build with AddressSanitizer
+make valgrind     # Build with Valgrind support
+make security     # Build with security compilation flags
 ```
 
 **MANUAL BUILD (Platform-Specific):**
@@ -140,6 +142,9 @@ clang extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
 
 # Legacy version
 ./extract_shellcode payload.exe shellcode.bin
+
+# If no output filename is specified, default is generated as input + ".shellcode.bin"
+./purl_diver payload.exe
 ```
 
 **2. ENABLE VERBOSE MODE FOR DETAILED OUTPUT**
@@ -233,11 +238,11 @@ hexdump -C output.bin
 
 ### CAPABILITIES
 
-- **Cross-platform compatibility** (Windows, Linux, macOS)
+- **Cross-platform compatibility** (Windows, Linux, macOS) with improved portability through custom my_strdup implementation
 - **x86/x64 architecture support**
 - **Intelligent section detection** via PE characteristics
-- **Overlap detection & handling** for malformed files
-- **Memory-safe extraction** with two-pass validation
+- **Overlap detection & handling** for malformed files (with sections sorted before processing to prevent missed overlaps)
+- **Memory-safe extraction** with two-pass validation and global cleanup function with atexit registration
 - **Multiple output formats** (binary, C, Python, hex, JSON)
 - **Comprehensive PE validation** (DOS, NT, section headers)
 
@@ -247,6 +252,7 @@ hexdump -C output.bin
 ### Security & ANALYSIS
 
 - **Integer overflow protection**
+- **Enhanced parameter validation** with improved validation for --min-size parameter using strtoul with overflow protection
 - **500MB file size limit** (prevents resource exhaustion)
 - **Entry point detection**
 - **Entropy analysis** (detect packed/encrypted code)
@@ -269,7 +275,7 @@ hexdump -C output.bin
 | Optimization | Impact | Description |
 |--------------|--------|-------------|
 | **PE Context Structure** | Performance & Maintainability | Consolidates PE-related data into a single context structure, reducing parameter passing and eliminating redundant calculations |
-| **Streaming Hash Functions** | Memory Efficiency | Implements chunked MD5 and SHA-256 algorithms that process data without large memory allocations for padded messages |
+| **Streaming Hash Functions** | Memory Efficiency | Implements chunked MD5 (RFC 1321) and SHA-256 (FIPS PUB 180-4) algorithms that process data without large memory allocations for padded messages |
 | **Optimized Section Parsing** | Performance | Eliminates duplicate string operations in section name parsing with single-pass processing |
 | **Memory Management** | Security | Enhanced bounds checking and proper resource cleanup throughout codebase |
 
