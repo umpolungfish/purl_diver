@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/purl_diver.dir/src/purl_diver.c.o CMakeFiles/purl_diver.dir/src/error_codes.c.o CMakeFiles/purl_diver.dir/src/pe_parser.c.o -o purl_diver  -lm 

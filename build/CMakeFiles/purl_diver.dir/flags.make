@@ -4,7 +4,7 @@
 # compile C with /usr/bin/cc
 C_DEFINES = -D_GNU_SOURCE
 
-C_INCLUDES = 
+C_INCLUDES = -I/home/mrnob0dy666/purl_diver_PUBLIC/include
 
 C_FLAGS = -Wall -Wextra -Wpedantic -Wno-unused-parameter -std=c11
 

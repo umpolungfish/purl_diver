@@ -172,41 +172,89 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named extract_shellcode
+# Target rules for targets named purl_diver
 
 # Build rule for target.
-extract_shellcode: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 extract_shellcode
-.PHONY : extract_shellcode
+purl_diver: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 purl_diver
+.PHONY : purl_diver
 
 # fast build rule for target.
-extract_shellcode/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/extract_shellcode.dir/build.make CMakeFiles/extract_shellcode.dir/build
-.PHONY : extract_shellcode/fast
+purl_diver/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/purl_diver.dir/build.make CMakeFiles/purl_diver.dir/build
+.PHONY : purl_diver/fast
 
-extract_shellcode.o: extract_shellcode.c.o
-.PHONY : extract_shellcode.o
+src/error_codes.o: src/error_codes.c.o
+.PHONY : src/error_codes.o
 
 # target to build an object file
-extract_shellcode.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/extract_shellcode.dir/build.make CMakeFiles/extract_shellcode.dir/extract_shellcode.c.o
-.PHONY : extract_shellcode.c.o
+src/error_codes.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/purl_diver.dir/build.make CMakeFiles/purl_diver.dir/src/error_codes.c.o
+.PHONY : src/error_codes.c.o
 
-extract_shellcode.i: extract_shellcode.c.i
-.PHONY : extract_shellcode.i
+src/error_codes.i: src/error_codes.c.i
+.PHONY : src/error_codes.i
 
 # target to preprocess a source file
-extract_shellcode.c.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/extract_shellcode.dir/build.make CMakeFiles/extract_shellcode.dir/extract_shellcode.c.i
-.PHONY : extract_shellcode.c.i
+src/error_codes.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/purl_diver.dir/build.make CMakeFiles/purl_diver.dir/src/error_codes.c.i
+.PHONY : src/error_codes.c.i
 
-extract_shellcode.s: extract_shellcode.c.s
-.PHONY : extract_shellcode.s
+src/error_codes.s: src/error_codes.c.s
+.PHONY : src/error_codes.s
 
 # target to generate assembly for a file
-extract_shellcode.c.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/extract_shellcode.dir/build.make CMakeFiles/extract_shellcode.dir/extract_shellcode.c.s
-.PHONY : extract_shellcode.c.s
+src/error_codes.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/purl_diver.dir/build.make CMakeFiles/purl_diver.dir/src/error_codes.c.s
+.PHONY : src/error_codes.c.s
+
+src/pe_parser.o: src/pe_parser.c.o
+.PHONY : src/pe_parser.o
+
+# target to build an object file
+src/pe_parser.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/purl_diver.dir/build.make CMakeFiles/purl_diver.dir/src/pe_parser.c.o
+.PHONY : src/pe_parser.c.o
+
+src/pe_parser.i: src/pe_parser.c.i
+.PHONY : src/pe_parser.i
+
+# target to preprocess a source file
+src/pe_parser.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/purl_diver.dir/build.make CMakeFiles/purl_diver.dir/src/pe_parser.c.i
+.PHONY : src/pe_parser.c.i
+
+src/pe_parser.s: src/pe_parser.c.s
+.PHONY : src/pe_parser.s
+
+# target to generate assembly for a file
+src/pe_parser.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/purl_diver.dir/build.make CMakeFiles/purl_diver.dir/src/pe_parser.c.s
+.PHONY : src/pe_parser.c.s
+
+src/purl_diver.o: src/purl_diver.c.o
+.PHONY : src/purl_diver.o
+
+# target to build an object file
+src/purl_diver.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/purl_diver.dir/build.make CMakeFiles/purl_diver.dir/src/purl_diver.c.o
+.PHONY : src/purl_diver.c.o
+
+src/purl_diver.i: src/purl_diver.c.i
+.PHONY : src/purl_diver.i
+
+# target to preprocess a source file
+src/purl_diver.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/purl_diver.dir/build.make CMakeFiles/purl_diver.dir/src/purl_diver.c.i
+.PHONY : src/purl_diver.c.i
+
+src/purl_diver.s: src/purl_diver.c.s
+.PHONY : src/purl_diver.s
+
+# target to generate assembly for a file
+src/purl_diver.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/purl_diver.dir/build.make CMakeFiles/purl_diver.dir/src/purl_diver.c.s
+.PHONY : src/purl_diver.c.s
 
 # Help Target
 help:
@@ -221,10 +269,16 @@ help:
 	@echo "... list_install_components"
 	@echo "... rebuild_cache"
 	@echo "... test"
-	@echo "... extract_shellcode"
-	@echo "... extract_shellcode.o"
-	@echo "... extract_shellcode.i"
-	@echo "... extract_shellcode.s"
+	@echo "... purl_diver"
+	@echo "... src/error_codes.o"
+	@echo "... src/error_codes.i"
+	@echo "... src/error_codes.s"
+	@echo "... src/pe_parser.o"
+	@echo "... src/pe_parser.i"
+	@echo "... src/pe_parser.s"
+	@echo "... src/purl_diver.o"
+	@echo "... src/purl_diver.i"
+	@echo "... src/purl_diver.s"
 .PHONY : help
 
 

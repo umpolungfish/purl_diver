@@ -1,22 +1,10 @@
-Improve PE Shellcode Extractor with comprehensive enhancements from SUGGESTIONS.md
+feat: Complete modularization and update documentation
 
-This commit implements all suggested improvements from SUGGESTIONS.md:
+This commit finalizes the transition to a fully modular architecture by removing the last pieces of duplicated code from the legacy `purl_diver.c` file.
 
-High Priority:
-- Fixed section overlap detection ordering issue by sorting sections before processing to prevent missed overlaps
-- Added comprehensive unit/integration tests for entropy calculation and hash functions
-
-Medium Priority:
-- Enhanced error handling with improved validation for --min-size parameter using strtoul with overflow protection
-- Added global cleanup function with atexit registration for proper resource management
-- Improved interactive mode error handling to return proper error codes
-- Replaced all strdup calls with custom my_strdup implementation for better portability
-- Added RFC/FIPS references to hash implementations (MD5/RFC 1321, SHA256/FIPS PUB 180-4)
-- Added Valgrind support and security compilation flags to Makefile
-
-Low Priority:
-- Implemented default output filename generation when none specified (input + ".shellcode.bin")
-- Fixed all compilation warnings to ensure clean build with -Werror
-- Added proper function declarations and unused parameter suppression
-
-The tool now handles edge cases better, has improved memory safety, maintains backward compatibility, and follows best practices for cross-platform compatibility.
+Key changes:
+- Removed duplicated PE header definitions, `PE_Context` struct, and several parsing/utility functions from `src/purl_diver.c` to resolve all "multiple definition" linker errors.
+- Added `#include "utils.h"` where needed to link to the centralized `my_strdup` implementation.
+- The `purl_diver` executable is now built cleanly from the modular sources defined in the `Makefile`.
+- Updated `README.md` and `DOCS/USAGE.md` to reflect the new executable name (`purl_diver`), global installation instructions, and updated command-line examples.
+- The legacy monolithic `extract_shellcode.c` and the now-refactored `src/purl_diver.c` are no longer part of the primary build, completing the refactoring process.

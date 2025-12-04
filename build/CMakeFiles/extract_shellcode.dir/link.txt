@@ -1,1 +1,0 @@
-/usr/bin/cc CMakeFiles/extract_shellcode.dir/extract_shellcode.c.o -o extract_shellcode  -lm 

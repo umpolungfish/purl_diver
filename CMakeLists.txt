@@ -30,7 +30,7 @@ message(STATUS "C Compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 
 # Source files
 set(SOURCES
-    extract_shellcode.c          # Main monolithic file (temporary)
+    src/purl_diver.c          # Main monolithic file (temporary)
     src/error_codes.c            # Error code utilities
     src/pe_parser.c              # PE parsing and validation
 )
@@ -39,24 +39,24 @@ set(SOURCES
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Create executable
-add_executable(extract_shellcode ${SOURCES})
+add_executable(purl_diver ${SOURCES})
 
 # Compiler-specific flags
 if(MSVC)
     # MSVC-specific flags
-    target_compile_options(extract_shellcode PRIVATE
+    target_compile_options(purl_diver PRIVATE
         /W4          # Warning level 4
         /WX-         # Don't treat warnings as errors (for now)
         /O2          # Optimize for speed
         /EHsc        # Exception handling model
     )
     if(STATIC_BUILD)
-        set_property(TARGET extract_shellcode PROPERTY
+        set_property(TARGET purl_diver PROPERTY
             MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     endif()
 else()
     # GCC/Clang flags
-    target_compile_options(extract_shellcode PRIVATE
+    target_compile_options(purl_diver PRIVATE
         -Wall
         -Wextra
         -Wpedantic
@@ -67,34 +67,34 @@ else()
 
     # Add _GNU_SOURCE for strdup on Linux
     if(UNIX AND NOT APPLE)
-        target_compile_definitions(extract_shellcode PRIVATE _GNU_SOURCE)
+        target_compile_definitions(purl_diver PRIVATE _GNU_SOURCE)
     endif()
 
     if(STATIC_BUILD)
-        target_link_options(extract_shellcode PRIVATE -static)
+        target_link_options(purl_diver PRIVATE -static)
     endif()
 endif()
 
 # Platform-specific libraries
 if(UNIX AND NOT APPLE)
     # Link math library on Linux
-    target_link_libraries(extract_shellcode PRIVATE m)
+    target_link_libraries(purl_diver PRIVATE m)
 elseif(APPLE)
     # Link math library on macOS
-    target_link_libraries(extract_shellcode PRIVATE m)
+    target_link_libraries(purl_diver PRIVATE m)
 endif()
 
 # Address Sanitizer
 if(ENABLE_ASAN)
     if(MSVC)
-        target_compile_options(extract_shellcode PRIVATE /fsanitize=address)
+        target_compile_options(purl_diver PRIVATE /fsanitize=address)
     else()
-        target_compile_options(extract_shellcode PRIVATE
+        target_compile_options(purl_diver PRIVATE
             -fsanitize=address
             -fno-omit-frame-pointer
             -g
         )
-        target_link_options(extract_shellcode PRIVATE -fsanitize=address)
+        target_link_options(purl_diver PRIVATE -fsanitize=address)
     endif()
     message(STATUS "Address Sanitizer: ENABLED")
 endif()
@@ -102,12 +102,12 @@ endif()
 # Undefined Behavior Sanitizer
 if(ENABLE_UBSAN)
     if(NOT MSVC)
-        target_compile_options(extract_shellcode PRIVATE
+        target_compile_options(purl_diver PRIVATE
             -fsanitize=undefined
             -fno-omit-frame-pointer
             -g
         )
-        target_link_options(extract_shellcode PRIVATE -fsanitize=undefined)
+        target_link_options(purl_diver PRIVATE -fsanitize=undefined)
         message(STATUS "Undefined Behavior Sanitizer: ENABLED")
     else()
         message(WARNING "UBSan not supported on MSVC")
@@ -117,8 +117,8 @@ endif()
 # Code coverage
 if(ENABLE_COVERAGE)
     if(NOT MSVC)
-        target_compile_options(extract_shellcode PRIVATE --coverage)
-        target_link_options(extract_shellcode PRIVATE --coverage)
+        target_compile_options(purl_diver PRIVATE --coverage)
+        target_link_options(purl_diver PRIVATE --coverage)
         message(STATUS "Code Coverage: ENABLED")
     else()
         message(WARNING "Coverage not supported on MSVC")
@@ -126,7 +126,7 @@ if(ENABLE_COVERAGE)
 endif()
 
 # Installation
-install(TARGETS extract_shellcode
+install(TARGETS purl_diver
     RUNTIME DESTINATION bin
     COMPONENT runtime
 )
@@ -152,7 +152,7 @@ if(BUILD_TESTING)
     # Basic functionality test
     add_test(
         NAME help_output
-        COMMAND extract_shellcode --help
+        COMMAND purl_diver --help
     )
 
     # Shell test suite integration

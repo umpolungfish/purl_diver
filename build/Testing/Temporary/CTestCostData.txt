@@ -1,4 +1,0 @@
-help_output 1 0.00147016
-shell_test_suite 0 0
----
-shell_test_suite

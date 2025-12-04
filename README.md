@@ -62,6 +62,15 @@ See [MODULAR_ARCHITECTURE.md](MODULAR_ARCHITECTURE.md) for complete architecture
 
 ## BUILDING AND USAGE
 
+### Installation (Optional)
+
+For convenience, you can install `purl_diver` globally, allowing you to run it from any directory.
+
+```bash
+sudo make install
+```
+This will place the executable in `/usr/local/bin/`.
+
 ### 
 
 - A C compiler (`gcc`, `clang`, or MSVC)
@@ -137,48 +146,48 @@ clang extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
 **1. EXTRACT SHELLCODE FROM PE FILE**
 
 ```bash
-# Modular version (recommended)
+# If installed globally
+purl_diver payload.exe shellcode.bin
+
+# If running from project directory
 ./purl_diver payload.exe shellcode.bin
 
-# Legacy version
-./extract_shellcode payload.exe shellcode.bin
-
-# If no output filename is specified, default is generated as input + ".shellcode.bin"
-./purl_diver payload.exe
+# If no output filename is specified, a default is generated
+purl_diver payload.exe
 ```
 
 **2. ENABLE VERBOSE MODE FOR DETAILED OUTPUT**
 
 ```bash
-./purl_diver -v payload.exe shellcode.bin
+purl_diver -v payload.exe shellcode.bin
 ```
 
 **3. EXTRACT WITH HASH CALCULATION**
 
 ```bash
-./purl_diver -h payload.exe shellcode.bin
+purl_diver -h payload.exe shellcode.bin
 ```
 
 **5. CALCULATE ENTROPY**
 
 ```bash
-./purl_diver -e payload.exe shellcode.bin
+purl_diver -e payload.exe shellcode.bin
 ```
 
 **6. OUTPUT IN DIFFERENT FORMATS**
 
 ```bash
 # Output as C array
-./purl_diver -f c payload.exe
+purl_diver -f c payload.exe
 
 # Output as Python byte string
-./purl_diver -f python payload.exe
+purl_diver -f python payload.exe
 
 # Output as hex dump
-./purl_diver -f hex payload.exe
+purl_diver -f hex payload.exe
 
 # Output as JSON with metadata
-./purl_diver -f json payload.exe
+purl_diver -f json payload.exe
 ```
 
 Success output:
@@ -191,31 +200,31 @@ Success output:
 **INCLUDE SPECIFIC SECTIONS:**
 
 ```bash
-./purl_diver --include .text payload.exe output.bin
+purl_diver --include .text payload.exe output.bin
 ```
 
 **EXCLUDE SPECIFIC SECTIONS:**
 
 ```bash
-./purl_diver --exclude .rsrc payload.exe output.bin
+purl_diver --exclude .rsrc payload.exe output.bin
 ```
 
 **MINIMUM SECTION SIZE:**
 
 ```bash
-./purl_diver --min-size 1024 payload.exe output.bin
+purl_diver --min-size 1024 payload.exe output.bin
 ```
 
 **ANALYZE IMPORT/EXPORT TABLES:**
 
 ```bash
-./purl_diver -i payload.exe output.bin
+purl_diver -i payload.exe output.bin
 ```
 
 **COMBINE MULTIPLE OPTIONS:**
 
 ```bash
-./purl_diver -v --hash --entropy -i payload.exe output.bin
+purl_diver -v --hash --entropy -i payload.exe output.bin
 ```
 
 ### INSPECTING OUTPUT
@@ -318,7 +327,7 @@ hexdump -C output.bin
 Raw binary output - perfect for direct shellcode usage:
 
 ```bash
-./purl_diver payload.exe shellcode.bin
+purl_diver payload.exe shellcode.bin
 ```
 
 </details>
@@ -331,7 +340,7 @@ Raw binary output - perfect for direct shellcode usage:
 Embed shellcode directly in C source:
 
 ```bash
-./purl_diver -f c payload.exe output.c
+purl_diver -f c payload.exe output.c
 ```
 
 **Output:**
@@ -354,7 +363,7 @@ unsigned int shellcode_len = 8192;
 Generate Python-ready byte strings:
 
 ```bash
-./purl_diver -f python payload.exe output.py
+purl_diver -f python payload.exe output.py
 ```
 
 **Output:**
@@ -374,7 +383,7 @@ shellcode += b"\xB8\x00\x00\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00"
 Human-readable hex dump with ASCII representation:
 
 ```bash
-./purl_diver -f hex payload.exe output.txt
+purl_diver -f hex payload.exe output.txt
 ```
 
 **Output:**
@@ -394,7 +403,7 @@ Human-readable hex dump with ASCII representation:
 Structured metadata with extraction details:
 
 ```bash
-./purl_diver -f json payload.exe output.json
+purl_diver -f json payload.exe output.json
 ```
 
 **Output:**
@@ -434,7 +443,7 @@ Structured metadata with extraction details:
 Detect packed or encrypted code sections:
 
 ```bash
-./purl_diver -e payload.exe shellcode.bin
+purl_diver -e payload.exe shellcode.bin
 ```
 
 **Entropy interpretation:**
@@ -447,7 +456,7 @@ Detect packed or encrypted code sections:
 Generate SHA256 hash of extracted code with improved memory efficiency:
 
 ```bash
-./purl_diver -h payload.exe shellcode.bin
+purl_diver -h payload.exe shellcode.bin
 ```
 
 **Output:**
@@ -460,7 +469,7 @@ Generate SHA256 hash of extracted code with improved memory efficiency:
 Analyze PE dependencies and exports:
 
 ```bash
-./purl_diver -i payload.exe shellcode.bin
+purl_diver -i payload.exe shellcode.bin
 ```
 
 **Output:**
@@ -582,13 +591,13 @@ Analyze PE dependencies and exports:
 Analyze large files with verbose mode to see detailed information:
 
 ```bash
-./purl_diver -v large_file.exe output.bin
+purl_diver -v large_file.exe output.bin
 ```
 
 Include hash and entropy analysis for comprehensive output:
 
 ```bash
-./purl_diver -v -h -e -i large_file.exe output.bin
+purl_diver -v -h -e -i large_file.exe output.bin
 ```
 <br>
 

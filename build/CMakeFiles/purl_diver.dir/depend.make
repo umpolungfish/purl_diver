@@ -1,2 +1,2 @@
-# Empty dependencies file for extract_shellcode.
+# Empty dependencies file for purl_diver.
 # This may be replaced when dependencies are built.

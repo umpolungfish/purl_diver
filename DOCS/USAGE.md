@@ -1,22 +1,35 @@
 # Usage Guide
 
-`PE Shellcode Extractor` is a command-line tool designed for simplicity and efficiency. After [compiling the tool](BUILD.md), you can run it from your terminal.
+`purl_diver` is a command-line tool designed for simplicity and efficiency. After [compiling the tool](BUILD.md), you can run it from your terminal.
+
+## Installation (Optional)
+
+You can install `purl_diver` globally to make it accessible from any terminal session without needing to specify the path to the executable.
+
+```bash
+sudo make install
+```
+This will copy the `purl_diver` binary to `/usr/local/bin`.
 
 ## Command-Line Syntax
 
-The tool requires two arguments: the path to the input PE file and the path for the output binary file where the extracted shellcode will be saved.
+The tool requires at least one argument: the path to the input PE file. The output path is optional.
 
 ```bash
-./extract_shellcode [options] <input_pe_file> <output_bin_file>
+# If installed globally
+purl_diver [options] <input_pe_file> [output_bin_file]
+
+# If running from the project directory
+./purl_diver [options] <input_pe_file> [output_bin_file]
 ```
 
 - `options`: Optional flags to modify the tool's behavior (see below).
 - `<input_pe_file>`: The PE file (e.g., `.exe`, `.dll`) from which you want to extract code.
-- `<output_bin_file>`: The path where the resulting shellcode will be written.
+- `[output_bin_file]`: Optional. The path where the resulting shellcode will be written. If omitted, a default name (`<input_pe_file>.shellcode.bin`) will be used.
 
 On Windows, you would run the executable as follows:
 ```bash
-extract_shellcode.exe [options] <input_pe_file> <output_bin_file>
+purl_diver.exe [options] <input_pe_file> [output_bin_file]
 ```
 
 ## Options
@@ -47,7 +60,7 @@ Suppose you have a PE file named `payload.exe` and you want to extract its execu
 You would run the following command:
 
 ```bash
-./extract_shellcode payload.exe shellcode.bin
+purl_diver payload.exe shellcode.bin
 ```
 
 If successful, the tool will print a confirmation message indicating the number of bytes extracted:
@@ -62,7 +75,7 @@ The resulting `shellcode.bin` file will contain the raw, concatenated code from 
 To enable verbose output showing detailed processing information:
 
 ```bash
-./extract_shellcode -v payload.exe shellcode.bin
+purl_diver -v payload.exe shellcode.bin
 ```
 
 This will output information such as:
@@ -79,7 +92,7 @@ This will output information such as:
 To display usage information:
 
 ```bash
-./extract_shellcode --help
+purl_diver --help
 ```
 
 ## Error and Warning Messages
