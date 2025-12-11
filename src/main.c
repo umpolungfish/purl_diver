@@ -14,15 +14,16 @@
 #include "../include/entropy.h"
 #include "../include/import_export_analyzer.h"
 #include "../include/options.h"
+#include "../include/batch_processor.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 
 /**
- * @brief Extract shellcode from PE file
+ * @brief Extract shellcode from a single PE file
  *
- * Main extraction logic that:
+ * Core extraction logic that:
  * 1. Initializes PE context
  * 2. Finds executable sections
  * 3. Detects overlaps and calculates size
@@ -31,9 +32,10 @@
  *
  * @param input_path Path to input PE file
  * @param output_path Path to output file
+ * @param output_path_can_be_null If true, non-binary formats can output to stdout
  * @return ExtractError code
  */
-ExtractError extract_shellcode(const char *input_path, const char *output_path) {
+ExtractError extract_shellcode_internal(const char *input_path, const char *output_path) {
     PE_Context ctx;
     ExtractError err;
 
@@ -56,14 +58,14 @@ ExtractError extract_shellcode(const char *input_path, const char *output_path) 
     }
 
     if (num_valid_sections == 0) {
-        fprintf(stdout, "[!] Warning: No executable sections found.\n");
+        fprintf(stdout, "[!] Warning: No executable sections found in '%s'.\n", input_path);
         free(valid_sections);
         cleanup_pe_context(&ctx);
         return EXTRACT_SUCCESS;
     }
 
     if (g_options.verbose) {
-        printf("[+] Found %zu executable sections:\n", num_valid_sections);
+        printf("[+] Found %zu executable sections in '%s':\n", num_valid_sections, input_path);
         for (size_t i = 0; i < num_valid_sections; i++) {
             char section_name[IMAGE_SIZEOF_SHORT_NAME + 1];
             safe_copy_section_name(valid_sections[i]->Name, section_name, sizeof(section_name));
@@ -84,7 +86,7 @@ ExtractError extract_shellcode(const char *input_path, const char *output_path) 
     }
 
     if (total_shellcode_size == 0) {
-        fprintf(stdout, "[!] Warning: All executable sections were overlapping or empty.\n");
+        fprintf(stdout, "[!] Warning: All executable sections were overlapping or empty in '%s'.\n", input_path);
         free(valid_sections);
         cleanup_pe_context(&ctx);
         return EXTRACT_SUCCESS;
@@ -121,6 +123,14 @@ ExtractError extract_shellcode(const char *input_path, const char *output_path) 
 
     // Output in requested format
     if (g_options.output_format == OUTPUT_BINARY) {
+        if (!output_path) {
+            fprintf(stderr, "[-] Error: Output path required for binary format\n");
+            free(output_buffer);
+            free(valid_sections);
+            cleanup_pe_context(&ctx);
+            return ERR_INVALID_ARGUMENTS;
+        }
+
         FILE *out_f = fopen(output_path, "wb");
         if (!out_f) {
             fprintf(stderr, "[-] Error: Failed to open output file '%s'\n", output_path);
@@ -133,27 +143,31 @@ ExtractError extract_shellcode(const char *input_path, const char *output_path) 
         fwrite(output_buffer, 1, current_pos, out_f);
         fclose(out_f);
 
-        printf("[+] Success: Extracted %zu bytes from %zu sections to '%s'\n",
-               current_pos, num_valid_sections, output_path);
+        if (g_options.verbose) {
+            printf("[+] Success: Extracted %zu bytes from %zu sections to '%s'\n",
+                   current_pos, num_valid_sections, output_path);
+        }
     } else {
         // Non-binary formats output to stdout
         char base_filename[256] = "shellcode";
 
-        // Extract base filename for C arrays
-        const char *p = strrchr(output_path, '/');
-        if (!p) p = strrchr(output_path, '\\');
-        if (p) p++; else p = output_path;
+        // Extract base filename for C arrays if output path is provided
+        if (output_path) {
+            const char *p = strrchr(output_path, '/');
+            if (!p) p = strrchr(output_path, '\\');
+            if (p) p++; else p = output_path;
 
-        strncpy(base_filename, p, sizeof(base_filename) - 1);
-        base_filename[sizeof(base_filename) - 1] = '\0';
+            strncpy(base_filename, p, sizeof(base_filename) - 1);
+            base_filename[sizeof(base_filename) - 1] = '\0';
 
-        // Remove extension
-        char *ext = strrchr(base_filename, '.');
-        if (ext) *ext = '\0';
+            // Remove extension
+            char *ext = strrchr(base_filename, '.');
+            if (ext) *ext = '\0';
 
-        // Replace hyphens with underscores
-        for (int i = 0; base_filename[i]; i++) {
-            if (base_filename[i] == '-') base_filename[i] = '_';
+            // Replace hyphens with underscores
+            for (int i = 0; base_filename[i]; i++) {
+                if (base_filename[i] == '-') base_filename[i] = '_';
+            }
         }
 
         switch (g_options.output_format) {
@@ -179,27 +193,35 @@ ExtractError extract_shellcode(const char *input_path, const char *output_path) 
                 return ERR_INVALID_ARGUMENTS;
         }
 
-        printf("[+] Success: Extracted %zu bytes from %zu sections\n",
-               current_pos, num_valid_sections);
+        if (g_options.verbose) {
+            printf("[+] Success: Extracted %zu bytes from %zu sections\n",
+                   current_pos, num_valid_sections);
+        }
     }
 
     // Calculate hash if requested
     if (g_options.include_hash) {
         unsigned char hash[32];
         calculate_sha256(output_buffer, current_pos, hash);
-        print_hash(hash, 32, "sha256");
+        if (g_options.verbose) {
+            print_hash(hash, 32, "sha256");
+        }
     }
 
     // Calculate entropy if requested
     if (g_options.include_entropy) {
         double entropy = calculate_entropy(output_buffer, current_pos);
-        printf("[INFO] Entropy: %.4f bits/byte\n", entropy);
+        if (g_options.verbose) {
+            printf("[INFO] Entropy: %.4f bits/byte\n", entropy);
+        }
     }
 
     // Analyze imports/exports if requested
     if (g_options.analyze_imports_exports) {
-        printf("\n");
-        print_imports_exports_summary(ctx.buffer, ctx.machine, ctx.file_size);
+        if (g_options.verbose) {
+            printf("\n");
+            print_imports_exports_summary(ctx.buffer, ctx.machine, ctx.file_size);
+        }
     }
 
     // Cleanup
@@ -208,6 +230,19 @@ ExtractError extract_shellcode(const char *input_path, const char *output_path) 
     cleanup_pe_context(&ctx);
 
     return EXTRACT_SUCCESS;
+}
+
+/**
+ * @brief Extract shellcode from PE file (public interface)
+ *
+ * Main extraction logic that calls the internal function with normal output path requirements
+ *
+ * @param input_path Path to input PE file
+ * @param output_path Path to output file
+ * @return ExtractError code
+ */
+ExtractError extract_shellcode(const char *input_path, const char *output_path) {
+    return extract_shellcode_internal(input_path, output_path);
 }
 
 int main(int argc, char **argv) {
@@ -224,14 +259,42 @@ int main(int argc, char **argv) {
         return (result == -1) ? 0 : 1;  // 0 for help/version, 1 for error
     }
 
-    // Extract shellcode
-    ExtractError err = extract_shellcode(input_path, output_path);
+    ExtractError err = EXTRACT_SUCCESS;
+
+    if (g_options.batch_mode) {
+        // Perform batch processing
+        if (g_options.verbose) {
+            printf("[+] Starting batch processing in directory: %s\n", g_options.batch_input_dir);
+            printf("    Output directory: %s\n", g_options.batch_output_dir ? g_options.batch_output_dir : "current directory");
+            printf("    File pattern: %s\n", g_options.batch_pattern ? g_options.batch_pattern : "default (*.exe,*.dll)");
+            printf("    Recursive: %s\n", g_options.batch_recursive ? "YES" : "NO");
+        }
+
+        err = process_batch(g_options.batch_input_dir,
+                           g_options.batch_output_dir,
+                           g_options.batch_pattern,
+                           g_options.batch_recursive,
+                           g_options.batch_log_file);
+
+        if (err == EXTRACT_SUCCESS) {
+            BatchStats stats = get_batch_stats();
+            printf("\n[+] Batch processing completed:\n");
+            printf("    Total files processed: %d\n", stats.total_files_processed);
+            printf("    Successful extractions: %d\n", stats.successful_extractions);
+            printf("    Failed extractions: %d\n", stats.failed_extractions);
+        } else {
+            fprintf(stderr, "[-] Batch processing failed\n");
+        }
+    } else {
+        // Perform single file extraction
+        err = extract_shellcode(input_path, output_path);
+    }
 
     // Cleanup
     free_section_filters();
 
     if (err != EXTRACT_SUCCESS) {
-        fprintf(stderr, "[-] Extraction failed: %s\n", error_string(err));
+        fprintf(stderr, "[-] Operation failed: %s\n", error_string(err));
         return 1;
     }
 

@@ -105,3 +105,20 @@ void output_as_json(unsigned char *data, size_t size, const char *input_path,
     printf("  ]\n");
     printf("}\n");
 }
+
+const char* get_output_extension(OutputFormat format) {
+    switch (format) {
+        case OUTPUT_BINARY:
+            return "bin";
+        case OUTPUT_C_ARRAY:
+            return "c";
+        case OUTPUT_PYTHON:
+            return "py";
+        case OUTPUT_HEX_DUMP:
+            return "txt";
+        case OUTPUT_JSON:
+            return "json";
+        default:
+            return "bin";  // default to binary
+    }
+}

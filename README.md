@@ -2,7 +2,7 @@
   <h1>purl diver</h1>
   <p><b>PE SHELLCODE EXTRACTOR</b></p>
   
-  <img src="./IMAGES/PURL.png" alt="purl_diver logo" width="400">
+  <img src="./images/purl_diver.png" alt="purl_diver logo" width="400">
 </div>
 
 <div align="center">
@@ -56,7 +56,7 @@
 - ✅ **43KB binary size** (optimized)
 - ✅ **Professional-grade code organization**
 
-See [MODULAR_ARCHITECTURE.md](MODULAR_ARCHITECTURE.md) for complete architecture documentation.
+See [MODULAR_ARCHITECTURE.md](./docs/MODULAR_ARCHITECTURE.md) for complete architecture documentation.
 
 <br>
 
@@ -143,7 +143,7 @@ clang extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
 
 > **Note**: The modular build produces the `purl_diver` binary. Legacy builds produce `extract_shellcode`. Both are functionally identical.
 
-**1. EXTRACT SHELLCODE FROM PE FILE**
+**1. EXTRACT SHELLCODE FROM SINGLE PE FILE**
 
 ```bash
 # If installed globally
@@ -156,25 +156,38 @@ purl_diver payload.exe shellcode.bin
 purl_diver payload.exe
 ```
 
-**2. ENABLE VERBOSE MODE FOR DETAILED OUTPUT**
+**2. BATCH PROCESSING MULTIPLE PE FILES**
+
+```bash
+# Process all .exe and .dll files in a directory
+purl_diver --batch ./samples
+
+# Process with custom output directory
+purl_diver --batch ./samples --batch-output-dir ./output
+
+# Process with recursive search in subdirectories
+purl_diver --batch ./malware --batch-recursive
+```
+
+**4. ENABLE VERBOSE MODE FOR DETAILED OUTPUT**
 
 ```bash
 purl_diver -v payload.exe shellcode.bin
 ```
 
-**3. EXTRACT WITH HASH CALCULATION**
+**5. EXTRACT WITH HASH CALCULATION**
 
 ```bash
 purl_diver -h payload.exe shellcode.bin
 ```
 
-**5. CALCULATE ENTROPY**
+**6. CALCULATE ENTROPY**
 
 ```bash
 purl_diver -e payload.exe shellcode.bin
 ```
 
-**6. OUTPUT IN DIFFERENT FORMATS**
+**7. OUTPUT IN DIFFERENT FORMATS**
 
 ```bash
 # Output as C array
@@ -225,6 +238,50 @@ purl_diver -i payload.exe output.bin
 
 ```bash
 purl_diver -v --hash --entropy -i payload.exe output.bin
+```
+
+### BATCH PROCESSING
+
+**PROCESS ALL PE FILES IN A DIRECTORY:**
+
+```bash
+purl_diver --batch ./malware_samples
+```
+
+**PROCESS WITH CUSTOM OUTPUT DIRECTORY:**
+
+```bash
+purl_diver --batch ./samples --batch-output-dir ./output
+```
+
+**PROCESS WITH RECURSIVE SUBDIRECTORY SEARCH:**
+
+```bash
+purl_diver --batch ./malware --batch-recursive
+```
+
+**PROCESS WITH CUSTOM FILE PATTERNS:**
+
+```bash
+purl_diver --batch ./samples --batch-pattern "*.exe,*.dll,*.sys"
+```
+
+**BATCH PROCESSING WITH SPECIFIC OUTPUT FORMAT:**
+
+```bash
+purl_diver --batch ./samples --batch-format c --batch-output-dir ./c_arrays
+```
+
+**BATCH PROCESSING WITH LOGGING:**
+
+```bash
+purl_diver --batch ./samples --batch-recursive --batch-log batch_results.txt
+```
+
+**COMBINE BATCH OPTIONS:**
+
+```bash
+purl_diver --batch ./malware_repo --batch-output-dir ./shellcode_output --batch-recursive --batch-format json --batch-log analysis.log
 ```
 
 ### INSPECTING OUTPUT
@@ -615,7 +672,7 @@ Contributions are welcome! When contributing:
 
 ## LICENSE
 
-This project is UNLICENSED
+This project is ![UNLICENSED](./UNLICENSE)
 
 <br>
 

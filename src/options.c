@@ -24,6 +24,10 @@ void init_options(void) {
     g_options.batch_mode = 0;
     g_options.interactive_mode = 0;
     g_options.batch_output_dir = NULL;
+    g_options.batch_input_dir = NULL;
+    g_options.batch_pattern = NULL;
+    g_options.batch_recursive = 0;
+    g_options.batch_log_file = NULL;
     g_options.min_section_size = 0;
 }
 
@@ -34,23 +38,34 @@ void print_version(void) {
 }
 
 void print_usage(const char *program_name) {
-    printf("Usage: %s [options] <input_pe_file> [output_file]\n\n", program_name);
-    printf("Options:\n");
+    printf("Usage: %s [options] <input_pe_file> [output_file]\n", program_name);
+    printf("   or: %s [options] --batch <input_dir> [batch_options]\n\n", program_name);
+    printf("General Options:\n");
     printf("  -v, --verbose          Enable verbose output\n");
     printf("  -h, --hash             Calculate and display SHA256 hash\n");
     printf("  -e, --entropy          Calculate and display entropy\n");
     printf("  -i, --imports-exports  Analyze import/export tables\n");
     printf("  -f, --format <type>    Output format: binary, c, python, hex, json\n");
-    printf("  --include <sections>   Only extract specified sections (comma-separated)\n");
-    printf("  --exclude <sections>   Exclude specified sections (comma-separated)\n");
-    printf("  --min-size <bytes>     Minimum section size to extract\n");
     printf("  --help                 Show this help message\n");
     printf("  --version              Show version information\n\n");
+    printf("Batch Processing Options:\n");
+    printf("  --batch <dir>          Process all PE files in directory\n");
+    printf("  --batch-output-dir <dir>  Directory for batch output files (default: current)\n");
+    printf("  --batch-pattern <pat>  File pattern to match (default: \"*.exe,*.dll\")\n");
+    printf("  --batch-recursive      Process subdirectories recursively\n");
+    printf("  --batch-log <file>     Log batch processing results to file\n");
+    printf("  --batch-format <fmt>   Output format for batch processing (default: binary)\n\n");
+    printf("Filtering Options:\n");
+    printf("  --include <sections>   Only extract specified sections (comma-separated)\n");
+    printf("  --exclude <sections>   Exclude specified sections (comma-separated)\n");
+    printf("  --min-size <bytes>     Minimum section size to extract\n\n");
     printf("Examples:\n");
     printf("  %s malware.exe shellcode.bin\n", program_name);
     printf("  %s -v --hash malware.exe shellcode.bin\n", program_name);
     printf("  %s -f c malware.exe\n", program_name);
-    printf("  %s --include .text,.data malware.exe output.bin\n\n", program_name);
+    printf("  %s --include .text,.data malware.exe output.bin\n", program_name);
+    printf("  %s --batch ./samples --batch-output-dir ./output --batch-format c\n", program_name);
+    printf("  %s --batch ./malware --batch-recursive --batch-pattern \"*.exe,*.dll\"\n\n", program_name);
 }
 
 int parse_arguments(int argc, char **argv, const char **input_path, const char **output_path) {
@@ -96,6 +111,57 @@ int parse_arguments(int argc, char **argv, const char **input_path, const char *
                 fprintf(stderr, "[-] Error: Unknown format '%s'\n", argv[i]);
                 return 1;
             }
+        } else if (strcmp(argv[i], "--batch") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "[-] Error: --batch requires a directory argument\n");
+                return 1;
+            }
+            i++;
+            g_options.batch_mode = 1;
+            g_options.batch_input_dir = argv[i];
+        } else if (strcmp(argv[i], "--batch-output-dir") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "[-] Error: --batch-output-dir requires a directory argument\n");
+                return 1;
+            }
+            i++;
+            g_options.batch_output_dir = argv[i];
+        } else if (strcmp(argv[i], "--batch-pattern") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "[-] Error: --batch-pattern requires a pattern argument\n");
+                return 1;
+            }
+            i++;
+            g_options.batch_pattern = argv[i];
+        } else if (strcmp(argv[i], "--batch-recursive") == 0) {
+            g_options.batch_recursive = 1;
+        } else if (strcmp(argv[i], "--batch-log") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "[-] Error: --batch-log requires a file argument\n");
+                return 1;
+            }
+            i++;
+            g_options.batch_log_file = argv[i];
+        } else if (strcmp(argv[i], "--batch-format") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "[-] Error: --batch-format requires a format argument\n");
+                return 1;
+            }
+            i++;
+            if (strcmp(argv[i], "binary") == 0) {
+                g_options.output_format = OUTPUT_BINARY;
+            } else if (strcmp(argv[i], "c") == 0 || strcmp(argv[i], "c-array") == 0) {
+                g_options.output_format = OUTPUT_C_ARRAY;
+            } else if (strcmp(argv[i], "python") == 0) {
+                g_options.output_format = OUTPUT_PYTHON;
+            } else if (strcmp(argv[i], "hex") == 0 || strcmp(argv[i], "hex-dump") == 0) {
+                g_options.output_format = OUTPUT_HEX_DUMP;
+            } else if (strcmp(argv[i], "json") == 0) {
+                g_options.output_format = OUTPUT_JSON;
+            } else {
+                fprintf(stderr, "[-] Error: Unknown batch format '%s'\n", argv[i]);
+                return 1;
+            }
         } else if (strcmp(argv[i], "--include") == 0) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "[-] Error: --include requires an argument\n");
@@ -124,8 +190,8 @@ int parse_arguments(int argc, char **argv, const char **input_path, const char *
             i++;
             g_options.min_section_size = (DWORD)atoi(argv[i]);
             min_section_size = g_options.min_section_size;
-        } else if (argv[i][0] != '-') {
-            // File argument
+        } else if (argv[i][0] != '-' && !g_options.batch_mode) {
+            // File argument (only for non-batch mode)
             if (file_args == 0) {
                 *input_path = argv[i];
                 file_args++;
@@ -136,6 +202,9 @@ int parse_arguments(int argc, char **argv, const char **input_path, const char *
                 fprintf(stderr, "[-] Error: Too many file arguments\n");
                 return 1;
             }
+        } else if (argv[i][0] != '-' && g_options.batch_mode) {
+            fprintf(stderr, "[-] Error: Can't specify input file when in batch mode\n");
+            return 1;
         } else {
             fprintf(stderr, "[-] Error: Unknown option '%s'\n", argv[i]);
             return 1;
@@ -143,20 +212,28 @@ int parse_arguments(int argc, char **argv, const char **input_path, const char *
     }
 
     // Validate arguments
-    if (file_args == 0) {
-        fprintf(stderr, "[-] Error: No input file specified\n");
-        return 1;
-    }
+    if (!g_options.batch_mode) {
+        if (file_args == 0) {
+            fprintf(stderr, "[-] Error: No input file specified\n");
+            return 1;
+        }
 
-    // For non-binary formats, output file is optional (stdout)
-    if (g_options.output_format == OUTPUT_BINARY && file_args < 2) {
-        fprintf(stderr, "[-] Error: Binary format requires both input and output files\n");
-        return 1;
-    }
+        // For non-binary formats, output file is optional (stdout)
+        if (g_options.output_format == OUTPUT_BINARY && file_args < 2) {
+            fprintf(stderr, "[-] Error: Binary format requires both input and output files\n");
+            return 1;
+        }
 
-    // Set default output path for non-binary formats
-    if (file_args == 1 && g_options.output_format != OUTPUT_BINARY) {
-        *output_path = "stdout";
+        // Set default output path for non-binary formats
+        if (file_args == 1 && g_options.output_format != OUTPUT_BINARY) {
+            *output_path = "stdout";
+        }
+    } else {
+        // Batch mode specific validation
+        if (!g_options.batch_input_dir) {
+            fprintf(stderr, "[-] Error: Batch mode requires --batch input directory\n");
+            return 1;
+        }
     }
 
     return 0;

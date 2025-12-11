@@ -75,4 +75,12 @@ void output_as_json(unsigned char *data, size_t size, const char *input_path,
                     PIMAGE_SECTION_HEADER *valid_sections, size_t num_valid_sections,
                     DWORD entry_point_rva, WORD machine);
 
+/**
+ * @brief Get the appropriate file extension for an output format
+ *
+ * @param format Output format to get extension for
+ * @return Constant string with the extension (without the dot)
+ */
+const char* get_output_extension(OutputFormat format);
+
 #endif // OUTPUT_FORMATS_H

@@ -17,7 +17,8 @@ MODULAR_SRC = src/main.c \
               src/output_formats.c \
               src/import_export_analyzer.c \
               src/utils.c \
-              src/options.c
+              src/options.c \
+              src/batch_processor.c
 
 # Default target builds modular version
 all: purl_diver

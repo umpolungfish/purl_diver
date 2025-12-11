@@ -44,6 +44,7 @@ typedef enum {
     ERR_MISSING_REQUIRED_ARG,         /**< Required argument missing */
     ERR_INVALID_FORMAT_OPTION,        /**< Invalid output format specified */
     ERR_INVALID_SECTION_NAME,         /**< Invalid section name filter */
+    ERR_FILE_ACCESS,                  /**< Failed to access file/directory */
 
     // Analysis errors (61-70)
     ERR_IMPORT_TABLE_INVALID,         /**< Corrupt import table */

@@ -231,4 +231,13 @@ typedef struct _IMAGE_IMPORT_BY_NAME {
 
 #endif // _WIN32
 
+// Output format enumeration - used across multiple modules
+typedef enum {
+    OUTPUT_BINARY,   // Default: raw binary
+    OUTPUT_C_ARRAY,  // C array format
+    OUTPUT_PYTHON,   // Python byte string
+    OUTPUT_HEX_DUMP, // Hex dump format
+    OUTPUT_JSON      // JSON format with metadata
+} OutputFormat;
+
 #endif // PE_TYPES_H

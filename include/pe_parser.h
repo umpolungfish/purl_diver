@@ -89,6 +89,16 @@ ExtractError initialize_pe_context(const char *input_path, PE_Context *ctx);
 void cleanup_pe_context(PE_Context *ctx);
 
 /**
+ * @brief Internal function to extract shellcode (for batch processing)
+ *
+ * @param input_path Path to input PE file
+ * @param output_path Path to output file
+ * @param output_path_can_be_null If true, non-binary formats can output to stdout
+ * @return ExtractError code
+ */
+ExtractError extract_shellcode_internal(const char *input_path, const char *output_path);
+
+/**
  * @brief Find all executable sections in PE file
  *
  * Searches for sections with IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_EXECUTE

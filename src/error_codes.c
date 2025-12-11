@@ -59,6 +59,8 @@ const char* error_string(ExtractError err) {
             return "Invalid output format specified";
         case ERR_INVALID_SECTION_NAME:
             return "Invalid section name in filter";
+        case ERR_FILE_ACCESS:
+            return "Failed to access file or directory";
 
         // Analysis errors
         case ERR_IMPORT_TABLE_INVALID:

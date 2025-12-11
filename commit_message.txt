@@ -1,10 +1,29 @@
-feat: Complete modularization and update documentation
+feat: Implement batch processing and enhance documentation
 
-This commit finalizes the transition to a fully modular architecture by removing the last pieces of duplicated code from the legacy `purl_diver.c` file.
+This commit introduces a comprehensive batch processing feature that allows `purl_diver` to process multiple PE files within a directory in a single run. The implementation is robust, cross-platform, and highly configurable.
 
-Key changes:
-- Removed duplicated PE header definitions, `PE_Context` struct, and several parsing/utility functions from `src/purl_diver.c` to resolve all "multiple definition" linker errors.
-- Added `#include "utils.h"` where needed to link to the centralized `my_strdup` implementation.
-- The `purl_diver` executable is now built cleanly from the modular sources defined in the `Makefile`.
-- Updated `README.md` and `DOCS/USAGE.md` to reflect the new executable name (`purl_diver`), global installation instructions, and updated command-line examples.
-- The legacy monolithic `extract_shellcode.c` and the now-refactored `src/purl_diver.c` are no longer part of the primary build, completing the refactoring process.
+Key Changes:
+
+1.  **Batch Processing Engine:**
+    *   Added a new `batch_processor` module (`src/batch_processor.c` and `include/batch_processor.h`) to encapsulate all batch-related logic.
+    *   Implemented cross-platform directory traversal for Windows (using `FindFirstFile`/`FindNextFile`) and Unix-like systems (using `opendir`/`readdir`).
+    *   The core extraction logic in `main.c` was refactored into a reusable `extract_shellcode_internal` function to be called by both single-file and batch modes.
+
+2.  **New Command-Line Options:**
+    *   `--batch <dir>`: Enables batch mode on a specified directory.
+    *   `--batch-output-dir <dir>`: Specifies a custom output directory for extracted files.
+    *   `--batch-recursive`: Enables recursive traversal of subdirectories.
+    *   `--batch-pattern <pattern>`: Filters files based on a comma-separated list of patterns (e.g., `"*.exe,*.dll"`).
+    *   `--batch-log <file>`: Writes a detailed log of successful and failed extractions.
+    *   `--batch-format <format>`: Sets a uniform output format for all files in the batch job.
+
+3.  **Code Refinements & Fixes:**
+    *   Resolved a "unused parameter" compilation warning in `extract_shellcode_internal` by removing the unnecessary parameter.
+    *   Moved the `OutputFormat` enum from `options.h` to `pe_types.h` to resolve a circular dependency issue that caused build failures.
+    *   Updated the `Makefile` to include the new `batch_processor.c` in the build process.
+
+4.  **Documentation Updates:**
+    *   Updated `README.md` with a new "Batch Processing" section, providing clear examples for all new command-line options.
+    *   Overhauled `DOCS/USAGE.md` to provide a complete and accurate reference for all general, filtering, and batch-processing command-line flags.
+
+This feature significantly enhances the utility of `purl_diver`, making it a powerful tool for large-scale malware analysis and shellcode extraction.

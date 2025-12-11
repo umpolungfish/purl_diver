@@ -10,14 +10,6 @@
 
 #include "pe_types.h"
 
-// Output format enumeration
-typedef enum {
-    OUTPUT_BINARY,   // Default: raw binary
-    OUTPUT_C_ARRAY,  // C array format
-    OUTPUT_PYTHON,   // Python byte string
-    OUTPUT_HEX_DUMP, // Hex dump format
-    OUTPUT_JSON      // JSON format with metadata
-} OutputFormat;
 
 // Global configuration structure
 typedef struct {
@@ -40,6 +32,10 @@ typedef struct {
 
     // Batch processing
     char *batch_output_dir;
+    char *batch_input_dir;
+    char *batch_pattern;
+    int batch_recursive;
+    char *batch_log_file;
 
     // Section filtering (managed by section_analyzer module)
     DWORD min_section_size;
