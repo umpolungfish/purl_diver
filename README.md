@@ -2,7 +2,7 @@
   <h1>purl diver</h1>
   <p><b>PE SHELLCODE EXTRACTOR</b></p>
   
-  <img src="./images/purl_diver.png" alt="purl_diver logo" width="400">
+  <img src="./images/purl_diver.png" alt="purl_diver logo" width="800">
 </div>
 
 <div align="center">
