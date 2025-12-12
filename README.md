@@ -44,9 +44,9 @@
 
 `purl_diver` tool prioritizes `security`, `robustness`, and `portability`, running seamlessly on Windows, Linux, and macOS.
 
-### 🏗️ Modular Architecture (v2.0)
+### Modular Architecture
 
-**purl_diver v2.0** features a completely refactored modular architecture with **9 independent modules** for improved maintainability, testability, and extensibility:
+**`purl_diver`** features a modular architecture with **9 independent modules**:
 
 - ✅ **Zero compilation warnings** (clean build with -Werror)
 - ✅ **100% functional parity** with monolithic version
