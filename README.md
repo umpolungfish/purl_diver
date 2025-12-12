@@ -27,18 +27,15 @@
   <a href="#use-cases">Use Cases</a>
 </p>
 
-<hr>
-
-<br>
+</div>
 
 ## OVERVIEW
 
-**purl_diver** is a cross-platform command-line tool for extracting shellcode from PE (Portable Executable) files.
-
+**`purl_diver`** is a cross-platform command-line tool for extracting shellcode from PE (Portable Executable) files.
 
 ---
 
-**purl_diver**:
+**`purl_diver`**:
 
 1. **PARSES** PE file structure with comprehensive validation
 2. **IDENTIFIES** executable sections via `IMAGE_SCN_CNT_CODE` or `IMAGE_SCN_MEM_EXECUTE` flags
