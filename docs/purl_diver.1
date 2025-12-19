@@ -1,0 +1,97 @@
+.TH PURL_DIVER 1 "December 2025" "purl_diver 1.0" "User Commands"
+
+.SH NAME
+purl_diver \- extract code from PE files.
+
+.SH SYNOPSIS
+.B purl_diver
+[\fIoptions\fR] <\fIinput_pe_file\fR> [\fIoutput_file\fR]
+.br
+.B purl_diver
+\fB--batch\fR <\fIinput_dir\fR> [\fIbatch_options\fR]
+
+.SH DESCRIPTION
+\fBpurl_diver\fR is a command-line tool to extract code from Portable Executable (PE) files, such as .exe and .dll files. It can extract from single files or process directories in batch mode. It supports various output formats and filtering options.
+
+.SH OPTIONS
+.SS General Options
+.TP
+\fB-v, --verbose\fR
+Enable verbose output, showing detailed processing information.
+.TP
+\fB-h, --hash\fR
+Calculate and display the SHA256 hash of the extracted code.
+.TP
+\fB-e, --entropy\fR
+Calculate and display the entropy of the extracted code.
+.TP
+\fB-i, --imports-exports\fR
+Analyze and display the PE file's import and export tables.
+.TP
+\fB--help\fR
+Display usage information and exit.
+.TP
+\fB--version\fR
+Display version information.
+
+.SS Output and Filtering Options
+.TP
+\fB-f, --format <type>\fR
+Output format for single-file mode: \fBbinary\fR, \fBc\fR, \fBpython\fR, \fBhex\fR, \fBjson\fR (default: \fBbinary\fR).
+.TP
+\fB--include <sections>\fR
+Comma-separated list of sections to include exclusively in the extraction (e.g., .text,.data).
+.TP
+\fB--exclude <sections>\fR
+Comma-separated list of sections to exclude from the extraction.
+.TP
+\fB--min-size <bytes>\fR
+Minimum section size in bytes to be considered for extraction.
+
+.SS Batch Processing Options
+.TP
+\fB--batch <dir>\fR
+Process all PE files in the specified directory.
+.TP
+\fB--batch-output-dir <dir>\fR
+Directory where batch output files will be saved. Defaults to the current directory.
+.TP
+\fB--batch-pattern <pattern>\fR
+Comma-separated file patterns to match (e.g., "*.exe,*.dll"). Default is "*.exe,*.dll,*.sys".
+.TP
+\fB--batch-recursive\fR
+Process subdirectories recursively.
+.TP
+\fB--batch-log <file>\fR
+Log the summary of the batch processing to a specified file.
+.TP
+\fB--batch-format <format>\fR
+Output format for all files in the batch job (\fBbinary\fR, \fBc\fR, \fBpython\fR, \fBhex\fR, \fBjson\fR). Defaults to \fBbinary\fR.
+
+.SH EXAMPLES
+.PP
+Extract executable code from \fBpayload.exe\fR to \fBshellcode.bin\fR:
+.IP
+.B purl_diver payload.exe shellcode.bin
+.PP
+Enable verbose output:
+.IP
+.B purl_diver -v payload.exe shellcode.bin
+.PP
+Display usage information:
+.IP
+.B purl_diver --help
+
+.SH EXIT STATUS
+.TP
+\fB0\fR
+Success.
+.TP
+\fBnon-zero\fR
+Failure.
+
+.SH BUGS
+Report bugs to the project's issue tracker.
+
+.SH AUTHOR
+The purl_diver project developers.

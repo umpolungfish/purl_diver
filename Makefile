@@ -68,10 +68,14 @@ clean:
 # Install (for system-wide use)
 install: purl_diver
 	sudo cp purl_diver /usr/local/bin/
+	sudo mkdir -p /usr/local/share/man/man1
+	sudo cp docs/purl_diver.1 /usr/local/share/man/man1/
+	sudo gzip -f /usr/local/share/man/man1/purl_diver.1
 
 # Uninstall
 uninstall:
 	sudo rm -f /usr/local/bin/purl_diver
+	sudo rm -f /usr/local/share/man/man1/purl_diver.1.gz
 
 # Help target
 help:
