@@ -5,13 +5,13 @@
 
 #define _GNU_SOURCE  // For strdup
 #include "../include/section_analyzer.h"
+#include "../include/pe_parser.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 
 // Global filter configuration
-int verbose = 0;
 char **include_sections = NULL;
 char **exclude_sections = NULL;
 size_t include_count = 0;
@@ -20,8 +20,7 @@ DWORD min_section_size = 0;
 
 int is_section_included(PIMAGE_SECTION_HEADER section) {
     char section_name[IMAGE_SIZEOF_SHORT_NAME + 1];
-    memcpy(section_name, section->Name, IMAGE_SIZEOF_SHORT_NAME);
-    section_name[IMAGE_SIZEOF_SHORT_NAME] = '\0';  // Ensure null termination
+    safe_copy_section_name(section->Name, section_name, sizeof(section_name));
 
     // Check minimum section size filter
     if (min_section_size > 0 && section->SizeOfRawData < min_section_size) {

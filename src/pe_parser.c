@@ -176,8 +176,9 @@ ExtractError find_executable_sections(PE_Context *ctx,
 
         // Check if section is executable (has CODE or EXECUTE characteristics)
         if (section->Characteristics & (IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_EXECUTE)) {
-            // Check for potential integer overflows in section bounds
-            if (section->PointerToRawData > (DWORD)(ctx->file_size - section->SizeOfRawData)) {
+            // Check for potential integer overflows in section bounds (safe order: size check first)
+            if (section->SizeOfRawData > (DWORD)ctx->file_size ||
+                section->PointerToRawData > (DWORD)ctx->file_size - section->SizeOfRawData) {
                 fprintf(stderr, "[-] Error: Section extends beyond file bounds.\n");
                 free(*valid_sections);
                 return ERR_SECTION_OUT_OF_BOUNDS;
@@ -193,9 +194,9 @@ ExtractError find_executable_sections(PE_Context *ctx,
                                section->PointerToRawData, section->SizeOfRawData);
                     }
 
-                    // Check if entry point is in this section
+                    // Check if entry point is in this section (overflow-safe: subtract after >= check)
                     if (ctx->entry_point_rva >= section->VirtualAddress &&
-                        ctx->entry_point_rva < section->VirtualAddress + section->Misc.VirtualSize) {
+                        ctx->entry_point_rva - section->VirtualAddress < section->Misc.VirtualSize) {
                         if (verbose) {
                             printf("[INFO] Entry point is in section '%.8s'\n", (char*)section->Name);
                         }

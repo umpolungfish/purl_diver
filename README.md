@@ -46,10 +46,10 @@
 
 ### Modular Architecture
 
-**`purl_diver`** features a modular architecture with **9 independent modules**:
+**`purl_diver`** features a modular architecture with **10 independent modules**:
 
-- ✅ **Zero compilation warnings** (clean build with -Werror)
-- ✅ **100% functional parity** with monolithic version
+- ✅ **Zero compilation warnings** (clean build with -Wall -Wextra -Wshadow -Wformat=2)
+- ✅ **Verified cryptographic implementations** (MD5 and SHA-256 unit-tested against known vectors)
 - ✅ **43KB binary size** (optimized)
 - ✅ **Professional-grade code organization**
 
@@ -88,10 +88,11 @@ make clean        # Remove build artifacts
 # Other targets
 make legacy       # Build legacy monolithic version
 make help         # Show all build targets
-make debug        # Debug build with symbols
-make asan         # Build with AddressSanitizer
-make valgrind     # Build with Valgrind support
-make security     # Build with security compilation flags
+make debug        # Debug build with AddressSanitizer + UBSan
+make valgrind     # Run under Valgrind for memory checking
+make security     # Build with -fstack-protector-strong + _FORTIFY_SOURCE
+make test         # Run all unit tests
+make test_hash    # Run MD5/SHA-256 vector tests
 ```
 
 **MANUAL BUILD (Platform-Specific):**
@@ -100,7 +101,7 @@ make security     # Build with security compilation flags
 
 ```bash
 # Modular version (recommended)
-cl src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c src/entropy.c src/section_analyzer.c src/output_formats.c src/import_export_analyzer.c src/utils.c src/options.c /Iinclude /O2 /W4 /EHsc /Fe:purl_diver.exe
+cl src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c src/entropy.c src/section_analyzer.c src/output_formats.c src/import_export_analyzer.c src/utils.c src/options.c src/batch_processor.c /Iinclude /O2 /W4 /EHsc /Fe:purl_diver.exe
 
 # Legacy monolithic version
 cl extract_shellcode.c /O2 /W4 /EHsc /Fe:extract_shellcode.exe
@@ -110,7 +111,7 @@ cl extract_shellcode.c /O2 /W4 /EHsc /Fe:extract_shellcode.exe
 
 ```bash
 # Modular version (recommended)
-gcc -Iinclude src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c src/entropy.c src/section_analyzer.c src/output_formats.c src/import_export_analyzer.c src/utils.c src/options.c -o purl_diver.exe -O2 -Wall -lm
+gcc -Iinclude src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c src/entropy.c src/section_analyzer.c src/output_formats.c src/import_export_analyzer.c src/utils.c src/options.c src/batch_processor.c -o purl_diver.exe -O2 -Wall -lm
 
 # Legacy monolithic version
 gcc extract_shellcode.c -o extract_shellcode.exe -O2 -Wall -lm
@@ -120,7 +121,7 @@ gcc extract_shellcode.c -o extract_shellcode.exe -O2 -Wall -lm
 
 ```bash
 # Modular version (recommended)
-gcc -Iinclude src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c src/entropy.c src/section_analyzer.c src/output_formats.c src/import_export_analyzer.c src/utils.c src/options.c -o purl_diver -O2 -Wall -lm
+gcc -Iinclude src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c src/entropy.c src/section_analyzer.c src/output_formats.c src/import_export_analyzer.c src/utils.c src/options.c src/batch_processor.c -o purl_diver -O2 -Wall -lm
 
 # Legacy monolithic version
 gcc extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
@@ -130,7 +131,7 @@ gcc extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
 
 ```bash
 # Modular version (recommended)
-clang -Iinclude src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c src/entropy.c src/section_analyzer.c src/output_formats.c src/import_export_analyzer.c src/utils.c src/options.c -o purl_diver -O2 -Wall -lm
+clang -Iinclude src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c src/entropy.c src/section_analyzer.c src/output_formats.c src/import_export_analyzer.c src/utils.c src/options.c src/batch_processor.c -o purl_diver -O2 -Wall -lm
 
 # Legacy monolithic version
 clang extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
@@ -338,9 +339,10 @@ hexdump -C output.bin
 | Optimization | Impact | Description |
 |--------------|--------|-------------|
 | **PE Context Structure** | Performance & Maintainability | Consolidates PE-related data into a single context structure, reducing parameter passing and eliminating redundant calculations |
-| **Streaming Hash Functions** | Memory Efficiency | Implements chunked MD5 (RFC 1321) and SHA-256 (FIPS PUB 180-4) algorithms that process data without large memory allocations for padded messages |
-| **Optimized Section Parsing** | Performance | Eliminates duplicate string operations in section name parsing with single-pass processing |
-| **Memory Management** | Security | Enhanced bounds checking and proper resource cleanup throughout codebase |
+| **Streaming Hash Functions** | Memory Efficiency & Correctness | MD5 (RFC 1321) and SHA-256 (FIPS PUB 180-4) with correct block rotation and UB-safe big-endian loads; verified against known test vectors |
+| **RVA Lookup Cache** | Performance | Flat `SectionCacheEntry` array in import/export analyzer avoids repeated O(n) linear scans and improves cache locality |
+| **Consolidated Section Names** | Maintainability | Single `safe_copy_section_name()` helper used everywhere; eliminates duplicate `memcpy` patterns |
+| **Input Validation** | Security | `strtol()` replaces `atoi()` for `--min-size`; integer overflow in section bounds checks eliminated; JSON control-character escaping fixed |
 
 ### ARCHITECTURE BENEFITS
 

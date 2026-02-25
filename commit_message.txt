@@ -1,29 +1,70 @@
-feat: Implement batch processing and enhance documentation
+fix: correct cryptographic bugs, harden security, and add hash unit tests
 
-This commit introduces a comprehensive batch processing feature that allows `purl_diver` to process multiple PE files within a directory in a single run. The implementation is robust, cross-platform, and highly configurable.
+Comprehensive hardening pass fixing real bugs, removing UB, and adding a
+verified test harness for the MD5 and SHA-256 implementations.
 
-Key Changes:
+Cryptographic fixes:
+  - hash_algorithms.c: MD5 was missing the left-rotation step entirely
+    (RFC 1321 §3.4); added s[64] rotation-amounts table and ROTL macro
+  - hash_algorithms.c: SHA-256 message-schedule loading used plain
+    `unsigned char << N` which is signed-integer UB under -O2; added
+    explicit uint32_t casts throughout md5_process_block and
+    sha256_process_block
 
-1.  **Batch Processing Engine:**
-    *   Added a new `batch_processor` module (`src/batch_processor.c` and `include/batch_processor.h`) to encapsulate all batch-related logic.
-    *   Implemented cross-platform directory traversal for Windows (using `FindFirstFile`/`FindNextFile`) and Unix-like systems (using `opendir`/`readdir`).
-    *   The core extraction logic in `main.c` was refactored into a reusable `extract_shellcode_internal` function to be called by both single-file and batch modes.
+Security / correctness fixes:
+  - pe_parser.c: integer overflow in entry-point bounds check
+    (VirtualAddress + VirtualSize could wrap); restructured to subtract
+    after the >= guard
+  - pe_parser.c: section raw-data bounds check now tests size before
+    subtraction to prevent underflow
+  - options.c: replaced atoi() with strtol() for --min-size; rejects
+    negative values, non-numeric input, and values exceeding UINT32_MAX
+  - output_formats.c: JSON printer escaped only \n \r \t; all control
+    characters < 0x20 are now emitted as \uXXXX per RFC 8259
+  - batch_processor.c: snprintf return value checked; paths that would
+    overflow the buffer are skipped with a warning instead of silently
+    truncated
 
-2.  **New Command-Line Options:**
-    *   `--batch <dir>`: Enables batch mode on a specified directory.
-    *   `--batch-output-dir <dir>`: Specifies a custom output directory for extracted files.
-    *   `--batch-recursive`: Enables recursive traversal of subdirectories.
-    *   `--batch-pattern <pattern>`: Filters files based on a comma-separated list of patterns (e.g., `"*.exe,*.dll"`).
-    *   `--batch-log <file>`: Writes a detailed log of successful and failed extractions.
-    *   `--batch-format <format>`: Sets a uniform output format for all files in the batch job.
+Maintainability:
+  - options.c / output_formats.c: added parse_output_format() helper;
+    --format and --batch-format both use it, eliminating duplicated
+    strcmp chains
+  - section_analyzer.c / utils.c / output_formats.c: replaced all
+    manual memcpy section-name extractions with safe_copy_section_name()
+  - options.h: int verbose declared extern once; definition moved to
+    options.c; removed redundant extern declarations from pe_parser.h,
+    section_analyzer.h, import_export_analyzer.h
+  - import_export_analyzer.c: rewritten with private SectionCacheEntry
+    cache built once per call for better locality; internal static
+    helpers accept pre-computed section info; public functions parse
+    headers exactly once
 
-3.  **Code Refinements & Fixes:**
-    *   Resolved a "unused parameter" compilation warning in `extract_shellcode_internal` by removing the unnecessary parameter.
-    *   Moved the `OutputFormat` enum from `options.h` to `pe_types.h` to resolve a circular dependency issue that caused build failures.
-    *   Updated the `Makefile` to include the new `batch_processor.c` in the build process.
+Build system:
+  - Makefile: moved -lm from CFLAGS to LDFLAGS; added -Wshadow
+    -Wstrict-prototypes -Wformat=2; switched to per-file object
+    compilation with automatic header-dependency tracking (-MMD -MP);
+    added test_hash target; clean removes .o and .d files
 
-4.  **Documentation Updates:**
-    *   Updated `README.md` with a new "Batch Processing" section, providing clear examples for all new command-line options.
-    *   Overhauled `DOCS/USAGE.md` to provide a complete and accurate reference for all general, filtering, and batch-processing command-line flags.
+Tests:
+  - tests/test_hash.c: new unit-test binary covering MD5 and SHA-256
+    against seven known-good vectors (empty string, "abc", "message
+    digest", 55×'a', 64×'a', 1000×'a', "The quick brown fox..."),
+    cross-verified with sha256sum / md5sum and Python hashlib
+  - test_suite.sh: rewritten with pass/fail counters; JSON output
+    validated via python3 -m json.tool; added --min-size rejection
+    tests, --format rejection test, truncated-PE test, and non-PE
+    file test
 
-This feature significantly enhances the utility of `purl_diver`, making it a powerful tool for large-scale malware analysis and shellcode extraction.
+Documentation:
+  - docs/BUILD.md: complete rewrite; Makefile is now primary build
+    path; manual commands updated to include src/batch_processor.c on
+    all platforms
+  - docs/USAGE.md: clarified --format accepted aliases (c-array,
+    hex-dump); documented that --min-size rejects negative/non-numeric
+    input; updated --include/--exclude to note multiple use
+  - README.md: corrected module count (9 → 10); replaced -Werror badge
+    with accurate warning flags; replaced non-existent make asan with
+    make debug; added make test / make test_hash to target list;
+    updated optimization table to reflect actual changes
+  - CLAUDE.md: created root-level guidance file replacing outdated
+    docs/CLAUDE.md

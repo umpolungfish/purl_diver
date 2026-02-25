@@ -60,7 +60,6 @@ void analyze_exports(unsigned char *buffer, DWORD rva_to_exports, WORD machine, 
  */
 void print_imports_exports_summary(unsigned char *buffer, WORD machine, long file_size);
 
-// Global verbose flag (defined in section_analyzer.c)
-extern int verbose;
+#include "options.h"
 
 #endif // IMPORT_EXPORT_ANALYZER_H

@@ -166,7 +166,6 @@ DWORD rva_to_file_offset(DWORD rva, PIMAGE_SECTION_HEADER section_table,
  */
 int compare_sections(const void *a, const void *b);
 
-// Global verbose flag (defined in main)
-extern int verbose;
+#include "options.h"
 
 #endif // PE_PARSER_H

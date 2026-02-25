@@ -44,6 +44,9 @@ typedef struct {
 // Global options instance (defined in options.c)
 extern ProgramOptions g_options;
 
+// Global verbose flag (defined in options.c, mirrors g_options.verbose)
+extern int verbose;
+
 /**
  * @brief Initialize options to default values
  */

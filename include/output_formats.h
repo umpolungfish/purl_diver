@@ -76,6 +76,17 @@ void output_as_json(unsigned char *data, size_t size, const char *input_path,
                     DWORD entry_point_rva, WORD machine);
 
 /**
+ * @brief Parse an output format name string into an OutputFormat enum value
+ *
+ * Accepts: "binary", "c", "c-array", "python", "hex", "hex-dump", "json"
+ *
+ * @param str Format name string
+ * @param format Output: parsed OutputFormat value (only set on success)
+ * @return 0 on success, -1 if str is not a recognized format name
+ */
+int parse_output_format(const char *str, OutputFormat *format);
+
+/**
  * @brief Get the appropriate file extension for an output format
  *
  * @param format Output format to get extension for

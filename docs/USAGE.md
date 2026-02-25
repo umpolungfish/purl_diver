@@ -42,17 +42,17 @@ purl_diver.exe [options] <input_pe_file> [output_file]
 
 ### General Options
 - `-v, --verbose`: Enable verbose output, showing detailed processing information.
-- `-h, --hash`: Calculate and display the SHA256 hash of the extracted code.
-- `-e, --entropy`: Calculate and display the entropy of the extracted code.
-- `-i, --imports-exports`: Analyze and display the PE file's import and export tables.
+- `--hash`: Calculate and display the SHA256 and MD5 hashes of the extracted code. (short form: `-h`)
+- `--entropy`: Calculate and display the entropy of the extracted code. (short form: `-e`)
+- `--imports-exports`: Analyze and display the PE file's import and export tables. (short form: `-i`)
 - `--help`: Display usage information and exit.
 - `--version`: Display version information.
 
 ### Output and Filtering Options
-- `-f, --format <type>`: Output format for single-file mode: `binary`, `c`, `python`, `hex`, `json` (default: `binary`).
-- `--include <sections>`: Comma-separated list of sections to include exclusively in the extraction (e.g., `.text,.data`).
-- `--exclude <sections>`: Comma-separated list of sections to exclude from the extraction.
-- `--min-size <bytes>`: Minimum section size in bytes to be considered for extraction.
+- `-f, --format <type>`: Output format for single-file mode. Accepted values: `binary`, `c` (or `c-array`), `python`, `hex` (or `hex-dump`), `json`. Default: `binary`. Unknown values are rejected with a non-zero exit code.
+- `--include <section>`: Only extract the named section (e.g., `.text`). May be specified multiple times.
+- `--exclude <section>`: Exclude the named section from extraction. May be specified multiple times.
+- `--min-size <bytes>`: Minimum section size in bytes to be considered for extraction. Must be a non-negative integer.
 
 ### Batch Processing Options
 - `--batch <dir>`: Process all PE files in the specified directory.

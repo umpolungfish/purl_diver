@@ -5,12 +5,18 @@
 
 #include "../include/options.h"
 #include "../include/section_analyzer.h"
+#include "../include/output_formats.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <limits.h>
 
 // Global options instance
 ProgramOptions g_options;
+
+// Global verbose flag (mirrors g_options.verbose for modules that include options.h)
+int verbose = 0;
 
 void init_options(void) {
     memset(&g_options, 0, sizeof(ProgramOptions));
@@ -97,17 +103,7 @@ int parse_arguments(int argc, char **argv, const char **input_path, const char *
                 return 1;
             }
             i++;
-            if (strcmp(argv[i], "binary") == 0) {
-                g_options.output_format = OUTPUT_BINARY;
-            } else if (strcmp(argv[i], "c") == 0 || strcmp(argv[i], "c-array") == 0) {
-                g_options.output_format = OUTPUT_C_ARRAY;
-            } else if (strcmp(argv[i], "python") == 0) {
-                g_options.output_format = OUTPUT_PYTHON;
-            } else if (strcmp(argv[i], "hex") == 0 || strcmp(argv[i], "hex-dump") == 0) {
-                g_options.output_format = OUTPUT_HEX_DUMP;
-            } else if (strcmp(argv[i], "json") == 0) {
-                g_options.output_format = OUTPUT_JSON;
-            } else {
+            if (parse_output_format(argv[i], &g_options.output_format) != 0) {
                 fprintf(stderr, "[-] Error: Unknown format '%s'\n", argv[i]);
                 return 1;
             }
@@ -148,17 +144,7 @@ int parse_arguments(int argc, char **argv, const char **input_path, const char *
                 return 1;
             }
             i++;
-            if (strcmp(argv[i], "binary") == 0) {
-                g_options.output_format = OUTPUT_BINARY;
-            } else if (strcmp(argv[i], "c") == 0 || strcmp(argv[i], "c-array") == 0) {
-                g_options.output_format = OUTPUT_C_ARRAY;
-            } else if (strcmp(argv[i], "python") == 0) {
-                g_options.output_format = OUTPUT_PYTHON;
-            } else if (strcmp(argv[i], "hex") == 0 || strcmp(argv[i], "hex-dump") == 0) {
-                g_options.output_format = OUTPUT_HEX_DUMP;
-            } else if (strcmp(argv[i], "json") == 0) {
-                g_options.output_format = OUTPUT_JSON;
-            } else {
+            if (parse_output_format(argv[i], &g_options.output_format) != 0) {
                 fprintf(stderr, "[-] Error: Unknown batch format '%s'\n", argv[i]);
                 return 1;
             }
@@ -188,8 +174,17 @@ int parse_arguments(int argc, char **argv, const char **input_path, const char *
                 return 1;
             }
             i++;
-            g_options.min_section_size = (DWORD)atoi(argv[i]);
-            min_section_size = g_options.min_section_size;
+            {
+                char *endptr;
+                errno = 0;
+                long val = strtol(argv[i], &endptr, 10);
+                if (errno != 0 || *endptr != '\0' || val < 0 || val > (long)UINT32_MAX) {
+                    fprintf(stderr, "[-] Error: Invalid value for --min-size: '%s'\n", argv[i]);
+                    return 1;
+                }
+                g_options.min_section_size = (DWORD)val;
+                min_section_size = g_options.min_section_size;
+            }
         } else if (argv[i][0] != '-' && !g_options.batch_mode) {
             // File argument (only for non-batch mode)
             if (file_args == 0) {

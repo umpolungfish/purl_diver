@@ -4,9 +4,11 @@
  */
 
 #include "../include/output_formats.h"
+#include "../include/pe_parser.h"
 #include "../include/entropy.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 void output_as_c_array(unsigned char *data, size_t size, const char *filename) {
     printf("unsigned char %s[] = {", filename ? filename : "shellcode");
@@ -67,27 +69,30 @@ void output_as_json(unsigned char *data, size_t size, const char *input_path,
     for (size_t i = 0; i < num_valid_sections; i++) {
         PIMAGE_SECTION_HEADER section = valid_sections[i];
         char section_name[IMAGE_SIZEOF_SHORT_NAME + 1];
-        memcpy(section_name, section->Name, IMAGE_SIZEOF_SHORT_NAME);
-        section_name[IMAGE_SIZEOF_SHORT_NAME] = '\0';
+        safe_copy_section_name(section->Name, section_name, sizeof(section_name));
 
         // Properly escape the section name to ensure valid JSON
         printf("    {\n");
         printf("      \"name\": \"");
         for (int j = 0; j < IMAGE_SIZEOF_SHORT_NAME && section_name[j] != '\0'; j++) {
-            if (section_name[j] == '\\' || section_name[j] == '"') {
-                printf("\\%c", section_name[j]);
-            } else if (section_name[j] == '\b') {
+            unsigned char c = (unsigned char)section_name[j];
+            if (c == '\\' || c == '"') {
+                printf("\\%c", c);
+            } else if (c == '\b') {
                 printf("\\b");
-            } else if (section_name[j] == '\f') {
+            } else if (c == '\f') {
                 printf("\\f");
-            } else if (section_name[j] == '\n') {
+            } else if (c == '\n') {
                 printf("\\n");
-            } else if (section_name[j] == '\r') {
+            } else if (c == '\r') {
                 printf("\\r");
-            } else if (section_name[j] == '\t') {
+            } else if (c == '\t') {
                 printf("\\t");
+            } else if (c < 0x20) {
+                /* Remaining control characters as \uXXXX */
+                printf("\\u%04X", (unsigned int)c);
             } else {
-                printf("%c", section_name[j]);
+                printf("%c", c);
             }
         }
         printf("\",\n");
@@ -104,6 +109,23 @@ void output_as_json(unsigned char *data, size_t size, const char *input_path,
     }
     printf("  ]\n");
     printf("}\n");
+}
+
+int parse_output_format(const char *str, OutputFormat *format) {
+    if (strcmp(str, "binary") == 0) {
+        *format = OUTPUT_BINARY;
+    } else if (strcmp(str, "c") == 0 || strcmp(str, "c-array") == 0) {
+        *format = OUTPUT_C_ARRAY;
+    } else if (strcmp(str, "python") == 0) {
+        *format = OUTPUT_PYTHON;
+    } else if (strcmp(str, "hex") == 0 || strcmp(str, "hex-dump") == 0) {
+        *format = OUTPUT_HEX_DUMP;
+    } else if (strcmp(str, "json") == 0) {
+        *format = OUTPUT_JSON;
+    } else {
+        return -1;
+    }
+    return 0;
 }
 
 const char* get_output_extension(OutputFormat format) {

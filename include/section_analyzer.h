@@ -11,6 +11,7 @@
 
 #include "pe_types.h"
 #include "error_codes.h"
+#include "options.h"
 #include <stddef.h>
 
 /**
@@ -61,7 +62,6 @@ ExtractError detect_overlaps_and_calculate_size(PIMAGE_SECTION_HEADER *valid_sec
                                                size_t *total_shellcode_size);
 
 // Global filter configuration (set by command-line parsing)
-extern int verbose;
 extern char **include_sections;
 extern char **exclude_sections;
 extern size_t include_count;

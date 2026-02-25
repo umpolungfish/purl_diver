@@ -5,6 +5,7 @@
 
 #define _GNU_SOURCE  // For strdup
 #include "../include/utils.h"
+#include "../include/pe_parser.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,8 +47,7 @@ int interactive_section_selection(PIMAGE_SECTION_HEADER *sections, size_t num_se
     printf("\nFound %zu executable sections:\n", num_sections);
     for (size_t i = 0; i < num_sections; i++) {
         char section_name[IMAGE_SIZEOF_SHORT_NAME + 1];
-        memcpy(section_name, sections[i]->Name, IMAGE_SIZEOF_SHORT_NAME);
-        section_name[IMAGE_SIZEOF_SHORT_NAME] = '\0';
+        safe_copy_section_name(sections[i]->Name, section_name, sizeof(section_name));
 
         printf("  [%zu] %s (%u bytes at RVA 0x%X)\n",
                i + 1, section_name, sections[i]->SizeOfRawData, sections[i]->VirtualAddress);
@@ -81,8 +81,7 @@ int interactive_section_selection(PIMAGE_SECTION_HEADER *sections, size_t num_se
         } else {
             // Add this section to include list
             char section_name[IMAGE_SIZEOF_SHORT_NAME + 1];
-            memcpy(section_name, sections[section_num - 1]->Name, IMAGE_SIZEOF_SHORT_NAME);
-            section_name[IMAGE_SIZEOF_SHORT_NAME] = '\0';
+            safe_copy_section_name(sections[section_num - 1]->Name, section_name, sizeof(section_name));
 
             // Add to include sections filter
             char **temp_include = (char **)realloc(include_sections, (include_count + 1) * sizeof(char *));

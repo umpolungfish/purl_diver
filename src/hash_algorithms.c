@@ -62,19 +62,30 @@ static void md5_process_block(MD5_Context *ctx, const unsigned char *block) {
         0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
     };
 
+    /* MD5 per-round left-rotation amounts (RFC 1321) */
+    static const int s[64] = {
+        7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,
+        5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,
+        4, 11, 16, 23,  4, 11, 16, 23,  4, 11, 16, 23,  4, 11, 16, 23,
+        6, 10, 15, 21,  6, 10, 15, 21,  6, 10, 15, 21,  6, 10, 15, 21
+    };
+
     uint32_t w[16];
     for (int i = 0; i < 16; i++) {
-        w[i] = (block[i * 4]) |
-               (block[i * 4 + 1] << 8) |
-               (block[i * 4 + 2] << 16) |
-               (block[i * 4 + 3] << 24);
+        /* Cast to uint32_t before shifting to avoid signed-integer overflow UB */
+        w[i] = (uint32_t)block[i * 4] |
+               ((uint32_t)block[i * 4 + 1] << 8) |
+               ((uint32_t)block[i * 4 + 2] << 16) |
+               ((uint32_t)block[i * 4 + 3] << 24);
     }
 
     uint32_t a = ctx->h[0], b = ctx->h[1], c = ctx->h[2], d = ctx->h[3];
 
-    // Main loop
+    /* Main loop — each round: compute F and index g, then
+     * b += ROTL(F + a + K[i] + M[g], s[i])  (RFC 1321 §3.4) */
     for (int i = 0; i < 64; i++) {
-        uint32_t f, g;
+        uint32_t f;
+        int      g;
 
         if (i < 16) {
             f = (b & c) | (~b & d);
@@ -90,11 +101,12 @@ static void md5_process_block(MD5_Context *ctx, const unsigned char *block) {
             g = (7 * i) % 16;
         }
 
-        f = f + a + k[i] + w[g];
+        uint32_t temp = f + a + k[i] + w[g];
         a = d;
         d = c;
         c = b;
-        b = b + f;
+        /* Apply the mandatory left-rotation before adding to b */
+        b = b + ((temp << s[i]) | (temp >> (32 - s[i])));
     }
 
     ctx->h[0] += a;
@@ -218,12 +230,14 @@ static void sha256_process_block(SHA256_Context *ctx, const unsigned char *block
         0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
     };
 
-    // Prepare message schedule
+    /* Prepare message schedule — cast to uint32_t before shifting to
+     * avoid signed-integer overflow UB when bytes >= 0x80 are shifted
+     * into or past the sign bit (e.g. 0x80u << 24 is UB for signed int) */
     for (int i = 0; i < 16; i++) {
-        w[i] = (block[i * 4] << 24) |
-               (block[i * 4 + 1] << 16) |
-               (block[i * 4 + 2] << 8) |
-               (block[i * 4 + 3]);
+        w[i] = ((uint32_t)block[i * 4]     << 24) |
+               ((uint32_t)block[i * 4 + 1] << 16) |
+               ((uint32_t)block[i * 4 + 2] <<  8) |
+                (uint32_t)block[i * 4 + 3];
     }
 
     for (int i = 16; i < 64; i++) {

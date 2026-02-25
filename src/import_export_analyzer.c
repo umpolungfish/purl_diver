@@ -7,85 +7,117 @@
 #include "../include/pe_parser.h"
 #include <stdio.h>
 
-void analyze_imports(unsigned char *buffer, DWORD *rva_to_imports, DWORD *rva_to_names,
-                     WORD machine, long file_size) {
-    PIMAGE_DOS_HEADER dos_header = (PIMAGE_DOS_HEADER)buffer;
-    DWORD nt_headers_offset = dos_header->e_lfanew;
-    PIMAGE_NT_HEADERS32 nt_headers = (PIMAGE_NT_HEADERS32)(buffer + nt_headers_offset);
+/* -------------------------------------------------------------------------
+ * Private helpers
+ * ---------------------------------------------------------------------- */
 
-    DWORD import_dir_rva = 0;
-    DWORD import_names_rva = 0;
+/**
+ * Flat lookup entry for O(n) RVA→offset resolution with better cache locality
+ * than dereferencing through IMAGE_SECTION_HEADER pointers per call.
+ */
+typedef struct {
+    DWORD rva_start;   /* section->VirtualAddress                   */
+    DWORD rva_end;     /* VirtualAddress + Misc.VirtualSize         */
+    DWORD raw_base;    /* PointerToRawData - VirtualAddress          */
+} SectionCacheEntry;
 
-    if (rva_to_imports) import_dir_rva = *rva_to_imports;
-    if (rva_to_names) {
-        import_names_rva = *rva_to_names;
-        // Use the import_names_rva value if additional analysis is available
-        if (verbose && import_names_rva != 0) {
-            printf("[INFO] Additional import names analysis available at RVA: 0x%08X\n", import_names_rva);
+/** Build a flat cache from the section table for repeated RVA lookups. */
+static void build_section_cache(PIMAGE_SECTION_HEADER section_table,
+                                WORD num_sections,
+                                SectionCacheEntry *cache)
+{
+    for (WORD i = 0; i < num_sections; i++) {
+        cache[i].rva_start = section_table[i].VirtualAddress;
+        cache[i].rva_end   = section_table[i].VirtualAddress
+                             + section_table[i].Misc.VirtualSize;
+        /* Guard against underflow: PointerToRawData may be 0 for BSS etc. */
+        cache[i].raw_base  = (section_table[i].PointerToRawData >= section_table[i].VirtualAddress)
+                             ? section_table[i].PointerToRawData - section_table[i].VirtualAddress
+                             : 0;
+    }
+}
+
+/** Resolve an RVA using the pre-built cache. Returns 0 if not found. */
+static DWORD cached_rva_to_offset(DWORD rva,
+                                  const SectionCacheEntry *cache,
+                                  WORD count,
+                                  long file_size)
+{
+    if (rva == 0) return 0;
+    for (WORD i = 0; i < count; i++) {
+        if (rva >= cache[i].rva_start && rva < cache[i].rva_end) {
+            DWORD offset = rva + cache[i].raw_base;
+            if (offset < (DWORD)file_size) return offset;
         }
     }
+    return 0;
+}
 
-    if (import_dir_rva == 0) {
-        // Get import directory from data directories if not provided
-        if (machine == IMAGE_FILE_MACHINE_I386) {  // 32-bit
-            PIMAGE_OPTIONAL_HEADER32 opt_header = (PIMAGE_OPTIONAL_HEADER32)&nt_headers->OptionalHeader;
-            import_dir_rva = opt_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-        } else {  // 64-bit
-            PIMAGE_NT_HEADERS64 nt_headers64 = (PIMAGE_NT_HEADERS64)nt_headers;
-            import_dir_rva = nt_headers64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-        }
-    }
+/**
+ * Compute section table pointer from buffer in one place.
+ * Called once per public function; the result is passed to the internal helpers.
+ */
+static PIMAGE_SECTION_HEADER get_section_table(PIMAGE_NT_HEADERS32 nt_headers)
+{
+    WORD opt_size = nt_headers->FileHeader.SizeOfOptionalHeader;
+    return (PIMAGE_SECTION_HEADER)((BYTE *)nt_headers
+                                   + sizeof(DWORD)
+                                   + sizeof(IMAGE_FILE_HEADER)
+                                   + opt_size);
+}
 
+/* -------------------------------------------------------------------------
+ * Internal analysis helpers (accept pre-computed section info + cache)
+ * ---------------------------------------------------------------------- */
+
+static void analyze_imports_internal(unsigned char *buffer,
+                                     DWORD import_dir_rva,
+                                     const SectionCacheEntry *cache,
+                                     WORD num_sections,
+                                     WORD machine,
+                                     long file_size)
+{
     if (import_dir_rva == 0) {
         if (verbose) printf("[INFO] No import directory found.\n");
         return;
     }
 
-    // Convert RVA to file offset using helper function
-    PIMAGE_SECTION_HEADER section_table;
-    WORD num_sections = nt_headers->FileHeader.NumberOfSections;
-    WORD size_of_optional_header = nt_headers->FileHeader.SizeOfOptionalHeader;
-
-    section_table = (PIMAGE_SECTION_HEADER)((BYTE *)nt_headers + sizeof(DWORD) + sizeof(IMAGE_FILE_HEADER) + size_of_optional_header);
-
-    DWORD import_dir_offset = rva_to_file_offset(import_dir_rva, section_table, num_sections, file_size);
-
+    DWORD import_dir_offset = cached_rva_to_offset(import_dir_rva, cache, num_sections, file_size);
     if (import_dir_offset == 0) {
         if (verbose) printf("[WARNING] Could not find section containing import directory.\n");
         return;
     }
 
-    PIMAGE_IMPORT_DESCRIPTOR import_desc = (PIMAGE_IMPORT_DESCRIPTOR)(buffer + import_dir_offset);
+    PIMAGE_IMPORT_DESCRIPTOR import_desc =
+        (PIMAGE_IMPORT_DESCRIPTOR)(buffer + import_dir_offset);
 
     printf("[IMPORTS ANALYSIS]\n");
 
-    // Process each import descriptor
     int import_count = 0;
     while (import_desc->Name != 0) {
-        // Convert DLL name RVA to file offset using helper function
-        DWORD dll_name_offset = rva_to_file_offset(import_desc->Name, section_table, num_sections, file_size);
+        DWORD dll_name_offset = cached_rva_to_offset(import_desc->Name, cache, num_sections, file_size);
 
         if (dll_name_offset != 0) {
             const char *dll_name = (const char *)(buffer + dll_name_offset);
             printf("  Imported DLL: %s\n", dll_name);
 
-            // Process imported functions from this DLL
-            // Convert thunk RVAs to file offsets using helper function
-            DWORD thunk_offset = rva_to_file_offset(import_desc->FirstThunk, section_table, num_sections, file_size);
-
-            DWORD orig_thunk_rva = (import_desc->OriginalFirstThunk != 0) ?
-                                   import_desc->OriginalFirstThunk : import_desc->FirstThunk;
-            DWORD original_thunk_offset = rva_to_file_offset(orig_thunk_rva, section_table, num_sections, file_size);
+            DWORD orig_thunk_rva = (import_desc->OriginalFirstThunk != 0)
+                                   ? import_desc->OriginalFirstThunk
+                                   : import_desc->FirstThunk;
+            DWORD thunk_offset         = cached_rva_to_offset(import_desc->FirstThunk, cache, num_sections, file_size);
+            DWORD original_thunk_offset = cached_rva_to_offset(orig_thunk_rva, cache, num_sections, file_size);
 
             if (thunk_offset != 0 && original_thunk_offset != 0) {
-                if (machine == IMAGE_FILE_MACHINE_I386) {  // 32-bit
-                    PIMAGE_THUNK_DATA32 thunk = (PIMAGE_THUNK_DATA32)(buffer + original_thunk_offset);
+                if (machine == IMAGE_FILE_MACHINE_I386) {
+                    PIMAGE_THUNK_DATA32 thunk =
+                        (PIMAGE_THUNK_DATA32)(buffer + original_thunk_offset);
                     while (thunk->u1.AddressOfData != 0) {
-                        if (!(thunk->u1.Ordinal & 0x80000000)) {  // Not an ordinal import
-                            DWORD hint_name_offset = rva_to_file_offset(thunk->u1.AddressOfData, section_table, num_sections, file_size);
-
+                        if (!(thunk->u1.Ordinal & 0x80000000)) {
+                            DWORD hint_name_offset = cached_rva_to_offset(
+                                thunk->u1.AddressOfData, cache, num_sections, file_size);
                             if (hint_name_offset != 0) {
-                                PIMAGE_IMPORT_BY_NAME hint_name = (PIMAGE_IMPORT_BY_NAME)(buffer + hint_name_offset);
+                                PIMAGE_IMPORT_BY_NAME hint_name =
+                                    (PIMAGE_IMPORT_BY_NAME)(buffer + hint_name_offset);
                                 printf("    - Function: %s (Hint: %d)\n",
                                        hint_name->Name, hint_name->Hint);
                             }
@@ -94,19 +126,22 @@ void analyze_imports(unsigned char *buffer, DWORD *rva_to_imports, DWORD *rva_to
                         }
                         thunk++;
                     }
-                } else {  // 64-bit
-                    PIMAGE_THUNK_DATA64 thunk = (PIMAGE_THUNK_DATA64)(buffer + original_thunk_offset);
+                } else {
+                    PIMAGE_THUNK_DATA64 thunk =
+                        (PIMAGE_THUNK_DATA64)(buffer + original_thunk_offset);
                     while (thunk->u1.AddressOfData != 0) {
-                        if (!(thunk->u1.Ordinal & 0x8000000000000000ULL)) {  // Not an ordinal import
-                            DWORD hint_name_offset = rva_to_file_offset((DWORD)thunk->u1.AddressOfData, section_table, num_sections, file_size);
-
+                        if (!(thunk->u1.Ordinal & 0x8000000000000000ULL)) {
+                            DWORD hint_name_offset = cached_rva_to_offset(
+                                (DWORD)thunk->u1.AddressOfData, cache, num_sections, file_size);
                             if (hint_name_offset != 0) {
-                                PIMAGE_IMPORT_BY_NAME hint_name = (PIMAGE_IMPORT_BY_NAME)(buffer + hint_name_offset);
+                                PIMAGE_IMPORT_BY_NAME hint_name =
+                                    (PIMAGE_IMPORT_BY_NAME)(buffer + hint_name_offset);
                                 printf("    - Function: %s (Hint: %d)\n",
                                        hint_name->Name, hint_name->Hint);
                             }
                         } else {
-                            printf("    - Ordinal: %lld\n", thunk->u1.Ordinal & 0x7FFFFFFFFFFFFFFFLL);
+                            printf("    - Ordinal: %lld\n",
+                                   thunk->u1.Ordinal & 0x7FFFFFFFFFFFFFFFLL);
                         }
                         thunk++;
                     }
@@ -121,77 +156,48 @@ void analyze_imports(unsigned char *buffer, DWORD *rva_to_imports, DWORD *rva_to
     printf("[END IMPORTS ANALYSIS - %d DLLs imported]\n\n", import_count);
 }
 
-void analyze_exports(unsigned char *buffer, DWORD rva_to_exports, WORD machine, long file_size) {
-    // Define DOS header at the beginning for access throughout
-    PIMAGE_DOS_HEADER dos_header = (PIMAGE_DOS_HEADER)buffer;
-
-    if (rva_to_exports == 0) {
-        // Get export directory from data directories if not provided
-        DWORD nt_headers_offset = dos_header->e_lfanew;
-        PIMAGE_NT_HEADERS32 nt_headers = (PIMAGE_NT_HEADERS32)(buffer + nt_headers_offset);
-
-        if (machine == IMAGE_FILE_MACHINE_I386) {  // 32-bit
-            PIMAGE_OPTIONAL_HEADER32 opt_header = (PIMAGE_OPTIONAL_HEADER32)&nt_headers->OptionalHeader;
-            rva_to_exports = opt_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
-        } else {  // 64-bit
-            PIMAGE_NT_HEADERS64 nt_headers64 = (PIMAGE_NT_HEADERS64)nt_headers;
-            rva_to_exports = nt_headers64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
-        }
-    }
-
-    if (rva_to_exports == 0) {
+static void analyze_exports_internal(unsigned char *buffer,
+                                     DWORD export_dir_rva,
+                                     const SectionCacheEntry *cache,
+                                     WORD num_sections,
+                                     long file_size)
+{
+    if (export_dir_rva == 0) {
         if (verbose) printf("[INFO] No export directory found.\n");
         return;
     }
 
-    // Convert RVA to file offset using helper function
-    DWORD nt_headers_offset = dos_header->e_lfanew;
-    PIMAGE_NT_HEADERS32 nt_headers = (PIMAGE_NT_HEADERS32)(buffer + nt_headers_offset);
-    PIMAGE_SECTION_HEADER section_table;
-    WORD num_sections = nt_headers->FileHeader.NumberOfSections;
-    WORD size_of_optional_header = nt_headers->FileHeader.SizeOfOptionalHeader;
-
-    section_table = (PIMAGE_SECTION_HEADER)((BYTE *)nt_headers + sizeof(DWORD) + sizeof(IMAGE_FILE_HEADER) + size_of_optional_header);
-
-    DWORD export_dir_offset = rva_to_file_offset(rva_to_exports, section_table, num_sections, file_size);
-
+    DWORD export_dir_offset = cached_rva_to_offset(export_dir_rva, cache, num_sections, file_size);
     if (export_dir_offset == 0) {
         if (verbose) printf("[WARNING] Could not find section containing export directory.\n");
         return;
     }
 
-    PIMAGE_EXPORT_DIRECTORY export_dir = (PIMAGE_EXPORT_DIRECTORY)(buffer + export_dir_offset);
+    PIMAGE_EXPORT_DIRECTORY export_dir =
+        (PIMAGE_EXPORT_DIRECTORY)(buffer + export_dir_offset);
 
-    // Get the name of the DLL (export name)
-    DWORD name_offset = rva_to_file_offset(export_dir->Name, section_table, num_sections, file_size);
-
-    const char *dll_name = "Unknown";
-    if (name_offset != 0) {
-        dll_name = (const char *)(buffer + name_offset);
-    }
+    DWORD name_offset = cached_rva_to_offset(export_dir->Name, cache, num_sections, file_size);
+    const char *dll_name = (name_offset != 0)
+                           ? (const char *)(buffer + name_offset)
+                           : "Unknown";
 
     printf("[EXPORTS ANALYSIS - %s]\n", dll_name);
     printf("  Base Ordinal: %d\n", export_dir->Base);
     printf("  Number of Functions: %d\n", export_dir->NumberOfFunctions);
     printf("  Number of Names: %d\n", export_dir->NumberOfNames);
 
-    // Print function names if available
     if (export_dir->NumberOfNames > 0 && export_dir->AddressOfNames != 0) {
-        // Convert AddressOfNames RVA to file offset using helper function
-        DWORD name_array_offset = rva_to_file_offset(export_dir->AddressOfNames, section_table, num_sections, file_size);
+        DWORD name_array_offset = cached_rva_to_offset(
+            export_dir->AddressOfNames, cache, num_sections, file_size);
 
         if (name_array_offset != 0) {
             DWORD *name_rvas = (DWORD *)(buffer + name_array_offset);
-
             for (DWORD i = 0; i < export_dir->NumberOfNames; i++) {
-                DWORD name_rva = name_rvas[i];
-
-                // Convert function name RVA to file offset using helper function
-                DWORD func_name_offset = rva_to_file_offset(name_rva, section_table, num_sections, file_size);
-
+                DWORD func_name_offset = cached_rva_to_offset(
+                    name_rvas[i], cache, num_sections, file_size);
                 if (func_name_offset != 0) {
-                    const char *func_name = (const char *)(buffer + func_name_offset);
-                    printf("    - Function: %s\n", func_name);
+                    printf("    - Function: %s\n",
+                           (const char *)(buffer + func_name_offset));
                 }
             }
         }
@@ -200,32 +206,105 @@ void analyze_exports(unsigned char *buffer, DWORD rva_to_exports, WORD machine, 
     printf("[END EXPORTS ANALYSIS]\n\n");
 }
 
-void print_imports_exports_summary(unsigned char *buffer, WORD machine, long file_size) {
-    // Get import/export directory RVAs
+/* -------------------------------------------------------------------------
+ * Public API
+ * ---------------------------------------------------------------------- */
+
+void analyze_imports(unsigned char *buffer, DWORD *rva_to_imports, DWORD *rva_to_names,
+                     WORD machine, long file_size)
+{
     PIMAGE_DOS_HEADER dos_header = (PIMAGE_DOS_HEADER)buffer;
-    DWORD nt_headers_offset = dos_header->e_lfanew;
-    PIMAGE_NT_HEADERS32 nt_headers = (PIMAGE_NT_HEADERS32)(buffer + nt_headers_offset);
+    PIMAGE_NT_HEADERS32 nt_headers =
+        (PIMAGE_NT_HEADERS32)(buffer + dos_header->e_lfanew);
+    PIMAGE_SECTION_HEADER section_table = get_section_table(nt_headers);
+    WORD num_sections = nt_headers->FileHeader.NumberOfSections;
+
+    /* Build the lookup cache once for this call */
+    SectionCacheEntry cache[num_sections];
+    build_section_cache(section_table, num_sections, cache);
+
+    DWORD import_dir_rva = 0;
+    if (rva_to_imports) {
+        import_dir_rva = *rva_to_imports;
+    }
+    if (rva_to_names && verbose && *rva_to_names != 0) {
+        printf("[INFO] Additional import names analysis available at RVA: 0x%08X\n",
+               *rva_to_names);
+    }
+
+    if (import_dir_rva == 0) {
+        if (machine == IMAGE_FILE_MACHINE_I386) {
+            PIMAGE_OPTIONAL_HEADER32 opt =
+                (PIMAGE_OPTIONAL_HEADER32)&nt_headers->OptionalHeader;
+            import_dir_rva =
+                opt->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+        } else {
+            PIMAGE_NT_HEADERS64 nt64 = (PIMAGE_NT_HEADERS64)nt_headers;
+            import_dir_rva =
+                nt64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+        }
+    }
+
+    analyze_imports_internal(buffer, import_dir_rva, cache, num_sections, machine, file_size);
+}
+
+void analyze_exports(unsigned char *buffer, DWORD rva_to_exports, WORD machine, long file_size)
+{
+    PIMAGE_DOS_HEADER dos_header = (PIMAGE_DOS_HEADER)buffer;
+    PIMAGE_NT_HEADERS32 nt_headers =
+        (PIMAGE_NT_HEADERS32)(buffer + dos_header->e_lfanew);
+    PIMAGE_SECTION_HEADER section_table = get_section_table(nt_headers);
+    WORD num_sections = nt_headers->FileHeader.NumberOfSections;
+
+    SectionCacheEntry cache[num_sections];
+    build_section_cache(section_table, num_sections, cache);
+
+    if (rva_to_exports == 0) {
+        if (machine == IMAGE_FILE_MACHINE_I386) {
+            PIMAGE_OPTIONAL_HEADER32 opt =
+                (PIMAGE_OPTIONAL_HEADER32)&nt_headers->OptionalHeader;
+            rva_to_exports =
+                opt->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+        } else {
+            PIMAGE_NT_HEADERS64 nt64 = (PIMAGE_NT_HEADERS64)nt_headers;
+            rva_to_exports =
+                nt64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+        }
+    }
+
+    analyze_exports_internal(buffer, rva_to_exports, cache, num_sections, file_size);
+}
+
+void print_imports_exports_summary(unsigned char *buffer, WORD machine, long file_size)
+{
+    /* Parse headers and build cache exactly once for both import and export analysis */
+    PIMAGE_DOS_HEADER dos_header = (PIMAGE_DOS_HEADER)buffer;
+    PIMAGE_NT_HEADERS32 nt_headers =
+        (PIMAGE_NT_HEADERS32)(buffer + dos_header->e_lfanew);
+    PIMAGE_SECTION_HEADER section_table = get_section_table(nt_headers);
+    WORD num_sections = nt_headers->FileHeader.NumberOfSections;
+
+    SectionCacheEntry cache[num_sections];
+    build_section_cache(section_table, num_sections, cache);
 
     DWORD import_rva = 0, export_rva = 0;
-
-    if (machine == IMAGE_FILE_MACHINE_I386) {  // 32-bit
-        PIMAGE_OPTIONAL_HEADER32 opt_header = (PIMAGE_OPTIONAL_HEADER32)&nt_headers->OptionalHeader;
-        import_rva = opt_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-        export_rva = opt_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
-    } else {  // 64-bit
-        PIMAGE_NT_HEADERS64 nt_headers64 = (PIMAGE_NT_HEADERS64)nt_headers;
-        import_rva = nt_headers64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-        export_rva = nt_headers64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+    if (machine == IMAGE_FILE_MACHINE_I386) {
+        PIMAGE_OPTIONAL_HEADER32 opt =
+            (PIMAGE_OPTIONAL_HEADER32)&nt_headers->OptionalHeader;
+        import_rva = opt->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+        export_rva = opt->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+    } else {
+        PIMAGE_NT_HEADERS64 nt64 = (PIMAGE_NT_HEADERS64)nt_headers;
+        import_rva = nt64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+        export_rva = nt64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
     }
 
     if (import_rva != 0) {
-        analyze_imports(buffer, &import_rva, NULL, machine, file_size);
+        analyze_imports_internal(buffer, import_rva, cache, num_sections, machine, file_size);
     }
-
     if (export_rva != 0) {
-        analyze_exports(buffer, export_rva, machine, file_size);
+        analyze_exports_internal(buffer, export_rva, cache, num_sections, file_size);
     }
-
     if (import_rva == 0 && export_rva == 0) {
         printf("[INFO] No import or export tables found in this PE file.\n");
     }

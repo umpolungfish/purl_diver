@@ -99,26 +99,6 @@ static int matches_pattern(const char *filename, const char *pattern) {
 }
 
 /**
- * @brief Get file extension for output format
- */
-static const char* get_output_extension(OutputFormat format) {
-    switch (format) {
-        case OUTPUT_BINARY:
-            return "bin";
-        case OUTPUT_C_ARRAY:
-            return "c";
-        case OUTPUT_PYTHON:
-            return "py";
-        case OUTPUT_HEX_DUMP:
-            return "txt";
-        case OUTPUT_JSON:
-            return "json";
-        default:
-            return "bin";  // default to binary
-    }
-}
-
-/**
  * @brief Process a single directory on Windows
  */
 static ExtractError process_directory_win(const char *dir_path, const char *output_dir,
@@ -143,7 +123,13 @@ static ExtractError process_directory_win(const char *dir_path, const char *outp
 
         // Build full file path
         char full_path[MAX_PATH];
-        snprintf(full_path, sizeof(full_path), "%s\\%s", dir_path, find_data.cFileName);
+        int path_n = snprintf(full_path, sizeof(full_path), "%s\\%s", dir_path, find_data.cFileName);
+        if (path_n < 0 || (size_t)path_n >= sizeof(full_path)) {
+            fprintf(stderr, "[-] Warning: Path too long, skipping: %s\\%s\n",
+                    dir_path, find_data.cFileName);
+            g_batch_stats.skipped_files++;
+            continue;
+        }
 
         if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
             // Process subdirectory if recursive mode is enabled
@@ -158,23 +144,36 @@ static ExtractError process_directory_win(const char *dir_path, const char *outp
 
                 // Generate output filename
                 char output_filename[MAX_PATH];
+                int out_n;
                 if (output_dir) {
                     const char *base_name = strrchr(find_data.cFileName, '\\');
                     if (base_name) base_name++;
                     else base_name = find_data.cFileName;
-
-                    snprintf(output_filename, sizeof(output_filename), "%s/%s_shellcode",
-                            output_dir, base_name);
+                    out_n = snprintf(output_filename, sizeof(output_filename),
+                                    "%s/%s_shellcode", output_dir, base_name);
                 } else {
-                    const char *base_name = find_data.cFileName;
-                    snprintf(output_filename, sizeof(output_filename), "%s_shellcode", base_name);
+                    out_n = snprintf(output_filename, sizeof(output_filename),
+                                    "%s_shellcode", find_data.cFileName);
+                }
+                if (out_n < 0 || (size_t)out_n >= sizeof(output_filename)) {
+                    fprintf(stderr, "[-] Warning: Output path too long, skipping: %s\n",
+                            find_data.cFileName);
+                    g_batch_stats.skipped_files++;
+                    continue;
                 }
 
                 // Ensure correct extension based on format
                 const char *ext = get_output_extension(g_options.output_format);
                 if (ext) {
-                    snprintf(output_filename + strlen(output_filename),
-                            sizeof(output_filename) - strlen(output_filename), ".%s", ext);
+                    int ext_n = snprintf(output_filename + out_n,
+                                        sizeof(output_filename) - (size_t)out_n,
+                                        ".%s", ext);
+                    if (ext_n < 0 || (size_t)ext_n >= sizeof(output_filename) - (size_t)out_n) {
+                        fprintf(stderr, "[-] Warning: Output path too long after extension, skipping: %s\n",
+                                find_data.cFileName);
+                        g_batch_stats.skipped_files++;
+                        continue;
+                    }
                 }
 
                 // Call extract_shellcode function for this file
@@ -195,7 +194,7 @@ static ExtractError process_directory_win(const char *dir_path, const char *outp
     return EXTRACT_SUCCESS;
 }
 
-#else  // Unix/Linux/MacOS
+#else  // Unix/Linux/macOS
 
 /**
  * @brief Check if a file matches the given pattern on Unix systems
@@ -254,7 +253,13 @@ static ExtractError process_directory_unix(const char *dir_path, const char *out
 
         // Build full file path
         char full_path[1024];
-        snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, entry->d_name);
+        int path_n = snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, entry->d_name);
+        if (path_n < 0 || (size_t)path_n >= sizeof(full_path)) {
+            fprintf(stderr, "[-] Warning: Path too long, skipping: %s/%s\n",
+                    dir_path, entry->d_name);
+            g_batch_stats.skipped_files++;
+            continue;
+        }
 
         struct stat path_stat;
         if (stat(full_path, &path_stat) == -1) {
@@ -274,18 +279,33 @@ static ExtractError process_directory_unix(const char *dir_path, const char *out
 
                 // Generate output filename
                 char output_filename[1024];
+                int out_n;
                 if (output_dir) {
-                    snprintf(output_filename, sizeof(output_filename), "%s/%s_shellcode",
-                            output_dir, entry->d_name);
+                    out_n = snprintf(output_filename, sizeof(output_filename),
+                                    "%s/%s_shellcode", output_dir, entry->d_name);
                 } else {
-                    snprintf(output_filename, sizeof(output_filename), "%s_shellcode", entry->d_name);
+                    out_n = snprintf(output_filename, sizeof(output_filename),
+                                    "%s_shellcode", entry->d_name);
+                }
+                if (out_n < 0 || (size_t)out_n >= sizeof(output_filename)) {
+                    fprintf(stderr, "[-] Warning: Output path too long, skipping: %s\n",
+                            entry->d_name);
+                    g_batch_stats.skipped_files++;
+                    continue;
                 }
 
                 // Ensure correct extension based on format
                 const char *ext = get_output_extension(g_options.output_format);
                 if (ext) {
-                    snprintf(output_filename + strlen(output_filename),
-                            sizeof(output_filename) - strlen(output_filename), ".%s", ext);
+                    int ext_n = snprintf(output_filename + out_n,
+                                        sizeof(output_filename) - (size_t)out_n,
+                                        ".%s", ext);
+                    if (ext_n < 0 || (size_t)ext_n >= sizeof(output_filename) - (size_t)out_n) {
+                        fprintf(stderr, "[-] Warning: Output path too long after extension, skipping: %s\n",
+                                entry->d_name);
+                        g_batch_stats.skipped_files++;
+                        continue;
+                    }
                 }
 
                 // Call extract_shellcode function for this file

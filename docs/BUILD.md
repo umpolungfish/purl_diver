@@ -1,66 +1,92 @@
 # Build Instructions
 
-`PE Shellcode Extractor` is written in standard C and can be compiled with common C compilers such as MSVC, GCC (MinGW on Windows), and Clang.
+`purl_diver` is written in C99 and builds with GCC, Clang, or MSVC on Windows, Linux, and macOS.
 
 ## Prerequisites
 
-- A C compiler (MSVC, GCC, or Clang).
-- On Windows, you can use the Visual Studio Build Tools or MinGW-w64.
-- On Linux, you can install the `build-essential` package (or equivalent).
-- On macOS, you can install the Xcode Command Line Tools.
+- A C compiler: GCC, Clang, or MSVC
+- **Windows**: Visual Studio Build Tools or MinGW-w64
+- **Linux**: `build-essential` package (`sudo apt install build-essential`)
+- **macOS**: Xcode Command Line Tools (`xcode-select --install`)
 
-## Compilation Commands
+---
 
-Below are the recommended commands for compiling `extract_shellcode.c` on different platforms. The commands include optimization flags (`/O2` or `-O2`) and warning flags (`/W4` or `-Wall`) to ensure a robust and efficient build.
+## Recommended: Makefile Build
 
-### Windows (with MSVC)
-
-Open a Developer Command Prompt for Visual Studio and run the following command:
+The Makefile is the primary build system. From the project root:
 
 ```bash
-cl extract_shellcode.c /O2 /W4 /EHsc /Fe:extract_shellcode.exe
+make              # Default optimized build → ./purl_diver
+make clean        # Remove all build artifacts (objects, deps, binaries)
+make install      # Install to /usr/local/bin + man page
+make uninstall    # Remove installed files
+make help         # List all available targets
 ```
 
-- `/O2`: Optimizes for speed.
-- `/W4`: Enables level 4 warnings (high level of scrutiny).
-- `/EHsc`: Specifies the exception-handling model.
-- `/Fe:extract_shellcode.exe`: Sets the output executable name.
-
-### Windows (with MinGW-w64)
-
-Open a terminal where the `gcc` command is available (like the one provided by Git Bash or MSYS2) and run:
+### Additional Targets
 
 ```bash
-gcc extract_shellcode.c -o extract_shellcode.exe -O2 -Wall -lm
+make debug        # Debug build: -g -O0 -fsanitize=address,undefined
+make security     # Hardened build: -fstack-protector-strong -D_FORTIFY_SOURCE=2
+make valgrind     # Build with debug symbols and run under Valgrind
+make legacy       # Build legacy monolithic version (extract_shellcode)
 ```
 
-- `-o extract_shellcode.exe`: Sets the output executable name.
-- `-O2`: Optimizes for speed.
-- `-Wall`: Enables all standard warnings.
-- `-lm`: Links the math library for entropy calculations.
-
-### Linux (with GCC)
-
-Open a terminal and run the following command:
+### Testing
 
 ```bash
-gcc extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
+make test         # Run all unit tests (entropy, comprehensive, hash)
+make test_hash    # Run MD5 / SHA-256 vector tests only
 ```
 
-This will produce an executable file named `extract_shellcode`.
+The Makefile compiles each source file to a separate object file and uses `-MMD -MP` to track header dependencies automatically, so incremental rebuilds are correct.
 
-- `-lm`: Links the math library for entropy calculations.
+---
 
-### macOS (with Clang)
+## Manual Compilation
 
-Open a terminal and run the following command:
+Use these commands if you cannot use `make` (e.g. on Windows with MSVC).
+
+The `-lm` flag is required on all platforms to link the math library for entropy calculations.
+
+### Windows (MSVC)
+
+Open a **Developer Command Prompt** and run:
 
 ```bash
-clang extract_shellcode.c -o extract_shellcode -O2 -Wall -lm
+cl src\main.c src\error_codes.c src\pe_parser.c src\hash_algorithms.c ^
+   src\entropy.c src\section_analyzer.c src\output_formats.c ^
+   src\import_export_analyzer.c src\utils.c src\options.c src\batch_processor.c ^
+   /Iinclude /O2 /W4 /EHsc /Fe:purl_diver.exe
 ```
 
-This will produce an executable file named `extract_shellcode`.
+### Windows (MinGW-w64)
 
-- `-lm`: Links the math library for entropy calculations.
+```bash
+gcc -Iinclude src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c \
+    src/entropy.c src/section_analyzer.c src/output_formats.c \
+    src/import_export_analyzer.c src/utils.c src/options.c src/batch_processor.c \
+    -o purl_diver.exe -O2 -Wall -std=c99 -lm
+```
 
-After successful compilation, you will have an executable ready to use. Refer to [USAGE.md](USAGE.md) for instructions on how to run it.
+### Linux (GCC)
+
+```bash
+gcc -Iinclude src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c \
+    src/entropy.c src/section_analyzer.c src/output_formats.c \
+    src/import_export_analyzer.c src/utils.c src/options.c src/batch_processor.c \
+    -o purl_diver -O2 -Wall -std=c99 -lm
+```
+
+### macOS (Clang)
+
+```bash
+clang -Iinclude src/main.c src/error_codes.c src/pe_parser.c src/hash_algorithms.c \
+      src/entropy.c src/section_analyzer.c src/output_formats.c \
+      src/import_export_analyzer.c src/utils.c src/options.c src/batch_processor.c \
+      -o purl_diver -O2 -Wall -std=c99 -lm
+```
+
+---
+
+After a successful build, refer to [USAGE.md](USAGE.md) for how to run the tool.
