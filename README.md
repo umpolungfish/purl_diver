@@ -678,5 +678,5 @@ This project is ![UNLICENSED](./UNLICENSE)
 <div align="center">
   <hr>
   <p><i>mfin' deep divin'!</i></p>
-  <p><b>purl_diver</b> - holy diver, you've been down too long in the darkweb seas!</p>
+  <p><b>purly diver</b>, you've been down too long in the darkweb seas!</p>
 </div>
